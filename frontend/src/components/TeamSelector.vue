@@ -36,9 +36,8 @@
             class="team-card"
             @click="$emit('teamSelected', team.id)"
           >
-            <!-- Team abbreviation displayed prominently (e.g., "NYY", "CHC") -->
+            <img :src="logoUrl(team.id)" :alt="team.name" class="team-logo" />
             <div class="team-abbr">{{ team.abbreviation }}</div>
-            <!-- Full team name shown smaller below the abbreviation -->
             <div class="team-name">{{ team.name }}</div>
           </div>
         </div>
@@ -57,6 +56,11 @@ import { getAllTeams } from '../services/gameApi.js'
  * passing the team's numeric ID as the payload.
  */
 defineEmits(['teamSelected'])
+
+/** Build the MLB CDN URL for a team's logo SVG using their numeric team ID. */
+function logoUrl(teamId) {
+  return `https://www.mlbstatic.com/team-logos/${teamId}.svg`
+}
 
 /**
  * Reactive array holding all teams fetched from the API.
@@ -188,8 +192,8 @@ onMounted(async () => {
   Cursor: pointer and transition provide interactive feedback.
 */
 .team-card {
-  background: #16213e;
-  border: 2px solid #0f3460;
+  background: #3a3a4a;
+  border: 2px solid #555;
   border-radius: 8px;
   padding: 14px 8px;
   cursor: pointer;
@@ -203,7 +207,7 @@ onMounted(async () => {
 */
 .team-card:hover {
   border-color: #e94560;
-  background: #1a2a4e;
+  background: #4a4a5a;
   transform: translateY(-2px);
 }
 
@@ -211,6 +215,13 @@ onMounted(async () => {
   Team abbreviation (e.g., "NYY") — displayed large and bold in monospace
   to mimic a scoreboard font. Yellow color makes it pop against the dark card.
 */
+.team-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+
 .team-abbr {
   font-size: 22px;
   font-weight: bold;

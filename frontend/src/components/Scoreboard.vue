@@ -51,7 +51,10 @@
 
         This prevents "spoiling" future innings in the scoreboard.
       -->
-      <div class="cell team-col">{{ awayTeamName || 'AWAY' }}</div>
+      <div class="cell team-col">
+        <img v-if="awayTeamId" :src="logoUrl(awayTeamId)" class="scoreboard-logo" />
+        {{ awayTeamName || 'AWAY' }}
+      </div>
       <div
         v-for="(runs, i) in awayScore"
         :key="'a' + i"
@@ -70,7 +73,10 @@
           bats in the bottom half, so their inning completes one half-inning later)
         - Show current inning's runs only if it's the bottom half (!isTop)
       -->
-      <div class="cell team-col">{{ homeTeamName || 'HOME' }}</div>
+      <div class="cell team-col">
+        <img v-if="homeTeamId" :src="logoUrl(homeTeamId)" class="scoreboard-logo" />
+        {{ homeTeamName || 'HOME' }}
+      </div>
       <div
         v-for="(runs, i) in homeScore"
         :key="'hm' + i"
@@ -170,7 +176,16 @@ const props = defineProps({
   homeTeamName: { type: String, default: '' },
   /** Name of the current batter (not currently displayed in scoreboard, but available) */
   currentBatterName: { type: String, default: '' },
+  /** Away team numeric ID — used to load the team logo from the MLB CDN */
+  awayTeamId: { type: Number, default: 0 },
+  /** Home team numeric ID — used to load the team logo from the MLB CDN */
+  homeTeamId: { type: Number, default: 0 },
 })
+
+/** Build the MLB CDN URL for a team's logo SVG. */
+function logoUrl(teamId) {
+  return `https://www.mlbstatic.com/team-logos/${teamId}.svg`
+}
 
 /**
  * Total number of innings to display in the scoreboard.
@@ -193,7 +208,7 @@ const totalInnings = computed(() => props.awayScore.length)
  * - 40px total column is slightly wider for emphasis
  */
 const gridStyle = computed(() => ({
-  gridTemplateColumns: `60px repeat(${totalInnings.value}, 1fr) 40px`,
+  gridTemplateColumns: `80px repeat(${totalInnings.value}, 1fr) 40px`,
 }))
 </script>
 
@@ -257,6 +272,13 @@ const gridStyle = computed(() => ({
   color: #e94560;
   font-size: 13px;
   padding-left: 6px;
+  gap: 4px;
+}
+
+.scoreboard-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 /* Team column in the header row should be gray, not red */

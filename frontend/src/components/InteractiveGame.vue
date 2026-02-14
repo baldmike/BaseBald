@@ -20,10 +20,6 @@
       Shown when: no game exists AND we're on step 1
     -->
     <div v-if="!game && setupStep === 1">
-      <!-- Baseball emoji as decorative hero art -->
-      <div class="title-art">&#9918;</div>
-      <h2 class="game-title">Interactive Baseball</h2>
-      <!-- TeamSelector emits 'teamSelected' with team ID when a card is clicked -->
       <TeamSelector @teamSelected="onTeamSelected" />
 
       <!--
@@ -49,9 +45,12 @@
             class="matchup-card"
             @click="selectClassicMatchup(m)"
           >
-            <!-- Matchup name (e.g., "Crosstown Classic") -->
+            <div class="matchup-logos">
+              <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
+              <span class="matchup-vs">vs</span>
+              <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
+            </div>
             <div class="matchup-label">{{ m.label }}</div>
-            <!-- Team details: year + name vs year + name -->
             <div class="matchup-teams">{{ m.home.season }} {{ m.home.name }} vs {{ m.away.season }} {{ m.away.name }}</div>
           </button>
         </div>
@@ -164,6 +163,7 @@
               :class="{ selected: selectedOpponentId === team.id }"
               @click="selectedOpponentId = team.id"
             >
+              <img :src="teamLogoUrl(team.id)" :alt="team.name" class="opponent-logo" />
               <div class="opponent-abbr">{{ team.abbreviation }}</div>
               <div class="opponent-name">{{ team.name }}</div>
             </div>
@@ -343,6 +343,8 @@
         :away-team-name="game.away_abbreviation"
         :home-team-name="game.home_abbreviation"
         :current-batter-name="game.current_batter_name"
+        :away-team-id="selectedOpponentId || 0"
+        :home-team-id="teamSelected || 0"
       />
 
       <!--
@@ -788,6 +790,8 @@ const classicMatchups = [
   { label: 'Bay Bridge Series', home: { id: 137, name: 'Giants', season: 2010 }, away: { id: 133, name: 'Athletics', season: 1972 } },
   { label: 'Amazin\' vs Magnificent', home: { id: 121, name: 'Mets', season: 1986 }, away: { id: 111, name: 'Red Sox', season: 1986 } },
   { label: 'Small Market Royalty', home: { id: 118, name: 'Royals', season: 2015 }, away: { id: 134, name: 'Pirates', season: 1979 } },
+  { label: 'Freeway Series', home: { id: 119, name: 'Dodgers', season: 1988 }, away: { id: 108, name: 'Angels', season: 2002 } },
+  { label: 'Braves vs Twins', home: { id: 144, name: 'Braves', season: 1995 }, away: { id: 142, name: 'Twins', season: 1991 } },
 ]
 
 /**
@@ -859,6 +863,11 @@ const currentBatter = computed(() => {
 function headshotUrl(playerId) {
   if (!playerId) return ''
   return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${playerId}/headshot/67/current`
+}
+
+/** Build the MLB CDN URL for a team's logo SVG. */
+function teamLogoUrl(teamId) {
+  return `https://www.mlbstatic.com/team-logos/${teamId}.svg`
 }
 
 // ============================================================
@@ -1303,7 +1312,7 @@ watch(
 
 /* The dropdown itself — dark blue background to match the app theme */
 .season-select select {
-  background: #16213e;
+  background: #3a3a4a;
   color: #e0e0e0;
   border: 1px solid #555;
   border-radius: 6px;
@@ -1405,7 +1414,7 @@ watch(
 
 /* Larger version of the season dropdown for the wizard steps */
 .season-dropdown {
-  background: #16213e;
+  background: #3a3a4a;
   color: #e0e0e0;
   border: 1px solid #555;
   border-radius: 6px;
@@ -1453,8 +1462,8 @@ watch(
 
 /* Individual opponent team card — same visual style as TeamSelector cards */
 .opponent-card {
-  background: #16213e;
-  border: 2px solid #0f3460;
+  background: #3a3a4a;
+  border: 2px solid #555;
   border-radius: 8px;
   padding: 14px 8px;
   cursor: pointer;
@@ -1465,17 +1474,24 @@ watch(
 /* Hover state: red border + slight lift */
 .opponent-card:hover {
   border-color: #e94560;
-  background: #1a2a4e;
+  background: #4a4a5a;
   transform: translateY(-2px);
 }
 
 /* Selected state: persistent red border + darker background (no lift needed) */
 .opponent-card.selected {
   border-color: #e94560;
-  background: #1a2a4e;
+  background: #4a4a5a;
 }
 
 /* Opponent team abbreviation — yellow monospace to match team card style */
+.opponent-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  margin-bottom: 4px;
+}
+
 .opponent-abbr {
   font-size: 22px;
   font-weight: bold;
@@ -1519,7 +1535,7 @@ watch(
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #16213e;
+  background: #3a3a4a;
   border: 2px solid #333;
   border-radius: 6px;
   padding: 10px 16px;
@@ -1538,7 +1554,7 @@ watch(
 /* Selected pitcher: persistent red border + slightly different background */
 .pitcher-option.selected {
   border-color: #e94560;
-  background: #1a1a3e;
+  background: #4a4a5a;
 }
 
 /* Pitcher name — bold for readability */
@@ -1611,7 +1627,7 @@ watch(
   border-radius: 50%;
   border: 2px solid #333;
   object-fit: cover;
-  background: #16213e;
+  background: #3a3a4a;
 }
 
 /* Pitcher headshot border: red to match the app's "danger/power" color for pitchers */
@@ -1745,7 +1761,7 @@ watch(
   as the most important piece of real-time information.
 */
 .last-play {
-  background: #16213e;
+  background: #3a3a4a;
   border: 1px solid #e94560;
   border-radius: 6px;
   padding: 10px 16px;
@@ -1800,7 +1816,7 @@ watch(
 
 /* Pitch type buttons — dark background with red border (ghost style) */
 .pitch-btn {
-  background: #16213e;
+  background: #3a3a4a;
   color: #e0e0e0;
   border-color: #e94560;
 }
@@ -1827,7 +1843,7 @@ watch(
 /* Take button — green border/text to contrast with the red swing button.
    Green = passive/safe (letting the pitch go by) vs red = aggressive (swinging). */
 .take-btn {
-  background: #16213e;
+  background: #3a3a4a;
   color: #4caf50;
   border-color: #4caf50;
   min-width: 140px;
@@ -1934,7 +1950,7 @@ watch(
 
 /* Speed control buttons — smaller than action buttons, neutral gray */
 .speed-btn {
-  background: #16213e;
+  background: #3a3a4a;
   color: #e0e0e0;
   border-color: #555;
   min-width: 80px;
@@ -2028,8 +2044,8 @@ watch(
 
 /* Individual matchup card — left-aligned text for readability of longer labels */
 .matchup-card {
-  background: #16213e;
-  border: 2px solid #0f3460;
+  background: #3a3a4a;
+  border: 2px solid #555;
   border-radius: 8px;
   padding: 12px;
   cursor: pointer;
@@ -2041,11 +2057,30 @@ watch(
 /* Matchup card hover: red border + subtle lift */
 .matchup-card:hover {
   border-color: #e94560;
-  background: #1a2a4e;
+  background: #4a4a5a;
   transform: translateY(-1px);
 }
 
 /* Matchup name label (e.g., "Crosstown Classic") — red for emphasis */
+.matchup-logos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.matchup-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.matchup-vs {
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+}
+
 .matchup-label {
   font-size: 13px;
   font-weight: bold;
