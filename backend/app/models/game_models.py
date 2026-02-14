@@ -14,6 +14,17 @@ class BatActionRequest(BaseModel):
 class TeamSelectionRequest(BaseModel):
     team_id: int
     season: int = 2024
+    home_pitcher_id: int | None = None
+    away_team_id: int | None = None
+    away_season: int | None = None
+    away_pitcher_id: int | None = None
+
+
+class PitcherInfo(BaseModel):
+    id: int
+    name: str
+    position: str
+    stats: dict
 
 
 class MLBTeam(BaseModel):

@@ -1,7 +1,7 @@
 <template>
   <div class="team-selector">
     <h2>Choose Your Team</h2>
-    <p class="subtitle">Select an MLB team to play as (opponent will be randomly assigned)</p>
+    <p class="subtitle">Select an MLB team to play as</p>
 
     <div v-if="loading" class="loading">Loading teams...</div>
     <div v-if="error" class="error">{{ error }}</div>

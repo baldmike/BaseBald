@@ -233,17 +233,12 @@ def get_player_pitching_stats(player_id: int, season: int = 2024) -> dict:
     return defaults
 
 
-def get_team_pitcher(team_id: int, season: int = 2024) -> dict:
-    """Fetch a starting pitcher from the team's roster with pitching stats.
+def get_team_pitchers(team_id: int, season: int = 2024) -> list[dict]:
+    """Fetch all pitchers from a team's roster with their pitching stats.
 
-    Returns dict: {id, name, position, stats}.
+    Returns list of dicts: {id, name, position, stats}.
     """
-    default_pitcher = {
-        "id": 0,
-        "name": "Unknown Pitcher",
-        "position": "P",
-        "stats": {"era": 4.30, "k_per_9": 8.20, "bb_per_9": 3.20},
-    }
+    default_stats = {"era": 4.30, "k_per_9": 8.20, "bb_per_9": 3.20}
     try:
         roster_data = statsapi.get(
             "team_roster", {"teamId": team_id, "rosterType": "active", "season": season}
@@ -253,21 +248,37 @@ def get_team_pitcher(team_id: int, season: int = 2024) -> dict:
             person = entry.get("person", {})
             position = entry.get("position", {})
             if position.get("type") == "Pitcher":
-                pitchers.append({
-                    "id": person.get("id"),
+                pitcher_id = person.get("id")
+                pitcher = {
+                    "id": pitcher_id,
                     "name": person.get("fullName", "Unknown"),
                     "position": position.get("abbreviation", "P"),
-                })
+                    "stats": get_player_pitching_stats(pitcher_id, season) if pitcher_id else dict(default_stats),
+                }
+                pitchers.append(pitcher)
 
-        if not pitchers:
-            return default_pitcher
-
-        # Pick the first pitcher (typically listed first on active roster)
-        pitcher = pitchers[0]
-        pitcher["stats"] = get_player_pitching_stats(pitcher["id"], season)
-        return pitcher
+        # Sort by ERA so the best pitcher is first
+        pitchers.sort(key=lambda p: p["stats"].get("era", 99))
+        return pitchers
     except Exception:
-        return default_pitcher
+        return []
+
+
+def get_team_pitcher(team_id: int, season: int = 2024) -> dict:
+    """Fetch the best starting pitcher from the team's roster (lowest ERA).
+
+    Returns dict: {id, name, position, stats}.
+    """
+    default_pitcher = {
+        "id": 0,
+        "name": "Unknown Pitcher",
+        "position": "P",
+        "stats": {"era": 4.30, "k_per_9": 8.20, "bb_per_9": 3.20},
+    }
+    pitchers = get_team_pitchers(team_id, season)
+    if pitchers:
+        return pitchers[0]  # Already sorted by ERA
+    return default_pitcher
 
 
 def get_random_opponent(exclude_team_id: int) -> dict:

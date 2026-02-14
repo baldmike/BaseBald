@@ -79,7 +79,14 @@ def _advance_batter(state: dict) -> None:
             state["home_batter_idx"] = (state.get("home_batter_idx", 0) + 1) % len(lineup)
 
 
-def create_new_game(home_team_id: int | None = None, season: int = 2024) -> dict:
+def create_new_game(
+    home_team_id: int | None = None,
+    season: int = 2024,
+    home_pitcher_id: int | None = None,
+    away_team_id: int | None = None,
+    away_season: int | None = None,
+    away_pitcher_id: int | None = None,
+) -> dict:
     state = _empty_state()
     state["game_id"] = str(uuid.uuid4())
 
@@ -90,21 +97,40 @@ def create_new_game(home_team_id: int | None = None, season: int = 2024) -> dict
             home_team = next((t for t in teams if t["id"] == home_team_id), None)
 
             if home_team:
-                # Pick random opponent
-                opponent = mlb_service.get_random_opponent(home_team_id)
+                # Use chosen opponent or pick random
+                if away_team_id:
+                    opponent = next((t for t in teams if t["id"] == away_team_id), None)
+                    if not opponent:
+                        opponent = mlb_service.get_random_opponent(home_team_id)
+                else:
+                    opponent = mlb_service.get_random_opponent(home_team_id)
+
+                opp_season = away_season or season
 
                 state["home_team"] = home_team["name"]
                 state["home_abbreviation"] = home_team["abbreviation"]
                 state["away_team"] = opponent["name"]
                 state["away_abbreviation"] = opponent["abbreviation"]
 
-                # Fetch lineups
+                # Fetch lineups (each team uses its own season)
                 state["home_lineup"] = mlb_service.get_team_lineup(home_team_id, season=season)
-                state["away_lineup"] = mlb_service.get_team_lineup(opponent["id"], season=season)
+                state["away_lineup"] = mlb_service.get_team_lineup(opponent["id"], season=opp_season)
 
-                # Fetch starting pitchers
-                state["home_pitcher"] = mlb_service.get_team_pitcher(home_team_id, season=season)
-                state["away_pitcher"] = mlb_service.get_team_pitcher(opponent["id"], season=season)
+                # Fetch home starting pitcher
+                if home_pitcher_id:
+                    pitchers = mlb_service.get_team_pitchers(home_team_id, season=season)
+                    chosen = next((p for p in pitchers if p["id"] == home_pitcher_id), None)
+                    state["home_pitcher"] = chosen or mlb_service.get_team_pitcher(home_team_id, season=season)
+                else:
+                    state["home_pitcher"] = mlb_service.get_team_pitcher(home_team_id, season=season)
+
+                # Fetch away starting pitcher
+                if away_pitcher_id:
+                    pitchers = mlb_service.get_team_pitchers(opponent["id"], season=opp_season)
+                    chosen = next((p for p in pitchers if p["id"] == away_pitcher_id), None)
+                    state["away_pitcher"] = chosen or mlb_service.get_team_pitcher(opponent["id"], season=opp_season)
+                else:
+                    state["away_pitcher"] = mlb_service.get_team_pitcher(opponent["id"], season=opp_season)
 
                 # Set initial batter
                 _get_current_batter(state)

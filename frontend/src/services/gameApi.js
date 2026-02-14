@@ -9,8 +9,20 @@ export async function getAllTeams() {
   return data
 }
 
-export async function createNewGame(teamId, season) {
-  const payload = teamId ? { team_id: teamId, season: season || 2024 } : undefined
+export async function getTeamPitchers(teamId, season) {
+  const { data } = await api.get('/game/pitchers', { params: { team_id: teamId, season: season || 2024 } })
+  return data
+}
+
+export async function createNewGame({ teamId, season, homePitcherId, awayTeamId, awaySeason, awayPitcherId } = {}) {
+  const payload = teamId ? {
+    team_id: teamId,
+    season: season || 2024,
+    home_pitcher_id: homePitcherId || null,
+    away_team_id: awayTeamId || null,
+    away_season: awaySeason || null,
+    away_pitcher_id: awayPitcherId || null,
+  } : undefined
   const { data } = await api.post('/game/new', payload)
   return data
 }

@@ -1,27 +1,128 @@
 <template>
   <div class="interactive-game">
-    <!-- Team Selection Screen -->
-    <div v-if="!game && !teamSelected">
+    <!-- Step 1: Pick Your Team -->
+    <div v-if="!game && setupStep === 1">
       <div class="title-art">&#9918;</div>
       <h2 class="game-title">Interactive Baseball</h2>
       <TeamSelector @teamSelected="onTeamSelected" />
-      <div class="season-select">
-        <label for="season">Season:</label>
-        <select id="season" v-model="selectedSeason">
-          <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
-        </select>
-      </div>
       <div class="skip-select">
-        <button class="skip-btn" @click="startGame(null)">Skip — Play without teams</button>
+        <button class="skip-btn" @click="startGame()">Skip — Play without teams</button>
       </div>
     </div>
 
-    <!-- Start Screen (team selected, ready to play) -->
-    <div v-if="!game && teamSelected" class="start-screen">
-      <div class="title-art">&#9918;</div>
-      <h2>Interactive Baseball</h2>
-      <p>Team selected! Ready to play.</p>
-      <button class="play-btn" @click="startGame(teamSelected)" :disabled="loading">
+    <!-- Step 2: Pick Your Season -->
+    <div v-if="!game && setupStep === 2" class="start-screen">
+      <div class="step-header">
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+        <h3 class="step-label">Your Team: {{ homeTeamName }}</h3>
+      </div>
+      <p>Choose the season for your roster:</p>
+      <div class="season-select pregame-season">
+        <select id="season" v-model="selectedSeason" class="season-dropdown">
+          <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
+        </select>
+      </div>
+      <button class="play-btn" @click="goToStep(3)">Next</button>
+    </div>
+
+    <!-- Step 3: Pick Your Pitcher -->
+    <div v-if="!game && setupStep === 3" class="start-screen">
+      <div class="step-header">
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+        <h3 class="step-label">{{ homeTeamName }} ({{ selectedSeason }})</h3>
+      </div>
+
+      <div v-if="loadingPitchers" class="pitcher-loading">Loading pitchers...</div>
+
+      <div v-else-if="pitcherList.length > 0" class="pitcher-selection">
+        <p>Choose your starting pitcher:</p>
+        <div class="pitcher-list">
+          <button
+            v-for="p in pitcherList"
+            :key="p.id"
+            class="pitcher-option"
+            :class="{ selected: selectedPitcherId === p.id }"
+            @click="selectedPitcherId = p.id"
+          >
+            <span class="pitcher-opt-name">{{ p.name }}</span>
+            <span class="pitcher-opt-stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="!loadingPitchers">
+        <p>No pitchers found — one will be assigned automatically.</p>
+      </div>
+
+      <button class="play-btn" @click="goToStep(4)" :disabled="loadingPitchers">Next</button>
+    </div>
+
+    <!-- Step 4: Pick Opponent -->
+    <div v-if="!game && setupStep === 4" class="start-screen">
+      <div class="step-header">
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+        <h3 class="step-label">Now pick the opponent</h3>
+      </div>
+      <div class="opponent-grid">
+        <div
+          v-for="team in opponentTeams"
+          :key="team.id"
+          class="opponent-card"
+          :class="{ selected: selectedOpponentId === team.id }"
+          @click="selectedOpponentId = team.id"
+        >
+          <div class="opponent-abbr">{{ team.abbreviation }}</div>
+          <div class="opponent-name">{{ team.name }}</div>
+        </div>
+      </div>
+      <button class="play-btn" @click="goToStep(5)" :disabled="!selectedOpponentId" style="margin-top: 20px">Next</button>
+    </div>
+
+    <!-- Step 5: Pick Opponent Season -->
+    <div v-if="!game && setupStep === 5" class="start-screen">
+      <div class="step-header">
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+        <h3 class="step-label">Opponent: {{ awayTeamName }}</h3>
+      </div>
+      <p>Choose the season for the opponent's roster:</p>
+      <div class="season-select pregame-season">
+        <select id="away-season" v-model="selectedAwaySeason" class="season-dropdown">
+          <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
+        </select>
+      </div>
+      <button class="play-btn" @click="goToStep(6)">Next</button>
+    </div>
+
+    <!-- Step 6: Pick Opponent Pitcher -->
+    <div v-if="!game && setupStep === 6" class="start-screen">
+      <div class="step-header">
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+        <h3 class="step-label">{{ awayTeamName }} ({{ selectedAwaySeason }})</h3>
+      </div>
+
+      <div v-if="loadingAwayPitchers" class="pitcher-loading">Loading pitchers...</div>
+
+      <div v-else-if="awayPitcherList.length > 0" class="pitcher-selection">
+        <p>Choose the opponent's starting pitcher:</p>
+        <div class="pitcher-list">
+          <button
+            v-for="p in awayPitcherList"
+            :key="p.id"
+            class="pitcher-option"
+            :class="{ selected: selectedAwayPitcherId === p.id }"
+            @click="selectedAwayPitcherId = p.id"
+          >
+            <span class="pitcher-opt-name">{{ p.name }}</span>
+            <span class="pitcher-opt-stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="!loadingAwayPitchers">
+        <p>No pitchers found — one will be assigned automatically.</p>
+      </div>
+
+      <button class="play-btn" @click="startGame()" :disabled="loading || loadingAwayPitchers">
         {{ loading ? 'Loading rosters...' : 'Play Ball!' }}
       </button>
     </div>
@@ -135,7 +236,7 @@
 
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
-import { createNewGame, throwPitch, batAction } from '../services/gameApi.js'
+import { createNewGame, getAllTeams, getTeamPitchers, throwPitch, batAction } from '../services/gameApi.js'
 import { useSoundEffects } from '../composables/useSoundEffects.js'
 import BaseballDiamond from './BaseballDiamond.vue'
 import Scoreboard from './Scoreboard.vue'
@@ -144,9 +245,35 @@ import TeamSelector from './TeamSelector.vue'
 const game = ref(null)
 const loading = ref(false)
 const logEl = ref(null)
+
+// Setup wizard state
+const setupStep = ref(1)
 const teamSelected = ref(null)
 const selectedSeason = ref(2024)
 const availableSeasons = Array.from({ length: 2025 - 1920 + 1 }, (_, i) => 2025 - i)
+const loadingPitchers = ref(false)
+const pitcherList = ref([])
+const selectedPitcherId = ref(null)
+const allTeams = ref([])
+const selectedOpponentId = ref(null)
+const selectedAwaySeason = ref(2024)
+const loadingAwayPitchers = ref(false)
+const awayPitcherList = ref([])
+const selectedAwayPitcherId = ref(null)
+
+const opponentTeams = computed(() => {
+  return allTeams.value.filter(t => t.id !== teamSelected.value)
+})
+
+const homeTeamName = computed(() => {
+  const team = allTeams.value.find(t => t.id === teamSelected.value)
+  return team?.name || 'Your Team'
+})
+
+const awayTeamName = computed(() => {
+  const team = allTeams.value.find(t => t.id === selectedOpponentId.value)
+  return team?.name || 'Opponent'
+})
 
 const { playForLastPlay } = useSoundEffects()
 
@@ -160,20 +287,79 @@ const pitchTypes = [
 // Show the pitcher who is currently on the mound
 const currentPitcherName = computed(() => {
   if (!game.value) return ''
-  // Top of inning: home pitcher is on the mound
-  // Bottom of inning: away pitcher is on the mound
   const pitcher = game.value.is_top ? game.value.home_pitcher : game.value.away_pitcher
   return pitcher?.name || ''
 })
 
 function onTeamSelected(teamId) {
   teamSelected.value = teamId
+  setupStep.value = 2
 }
 
-async function startGame(teamId) {
+async function goToStep(step) {
+  // When entering step 3, fetch home pitchers
+  if (step === 3) {
+    loadingPitchers.value = true
+    selectedPitcherId.value = null
+    pitcherList.value = []
+    setupStep.value = step
+    try {
+      const [pitchers, teams] = await Promise.all([
+        getTeamPitchers(teamSelected.value, selectedSeason.value),
+        allTeams.value.length ? Promise.resolve(allTeams.value) : getAllTeams(),
+      ])
+      pitcherList.value = pitchers
+      allTeams.value = teams
+      if (pitcherList.value.length > 0) {
+        selectedPitcherId.value = pitcherList.value[0].id
+      }
+    } finally {
+      loadingPitchers.value = false
+    }
+    return
+  }
+
+  // When entering step 6, fetch away pitchers
+  if (step === 6) {
+    loadingAwayPitchers.value = true
+    selectedAwayPitcherId.value = null
+    awayPitcherList.value = []
+    setupStep.value = step
+    try {
+      awayPitcherList.value = await getTeamPitchers(selectedOpponentId.value, selectedAwaySeason.value)
+      if (awayPitcherList.value.length > 0) {
+        selectedAwayPitcherId.value = awayPitcherList.value[0].id
+      }
+    } finally {
+      loadingAwayPitchers.value = false
+    }
+    return
+  }
+
+  setupStep.value = step
+}
+
+function goBack() {
+  if (setupStep.value === 2) {
+    // Back to team selection — reset everything
+    teamSelected.value = null
+    setupStep.value = 1
+  } else {
+    setupStep.value = setupStep.value - 1
+  }
+}
+
+async function startGame() {
   loading.value = true
   try {
-    game.value = await createNewGame(teamId, selectedSeason.value)
+    game.value = await createNewGame({
+      teamId: teamSelected.value,
+      season: selectedSeason.value,
+      homePitcherId: selectedPitcherId.value,
+      awayTeamId: selectedOpponentId.value,
+      awaySeason: selectedAwaySeason.value,
+      awayPitcherId: selectedAwayPitcherId.value,
+    })
   } finally {
     loading.value = false
   }
@@ -181,8 +367,15 @@ async function startGame(teamId) {
 
 function resetGame() {
   game.value = null
+  setupStep.value = 1
   teamSelected.value = null
   selectedSeason.value = 2024
+  pitcherList.value = []
+  selectedPitcherId.value = null
+  selectedOpponentId.value = null
+  selectedAwaySeason.value = 2024
+  awayPitcherList.value = []
+  selectedAwayPitcherId.value = null
 }
 
 async function doPitch(pitchType) {
@@ -303,6 +496,151 @@ watch(
 .start-screen p {
   color: #aaa;
   margin-bottom: 24px;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.step-label {
+  color: #ffdd00;
+  font-size: 16px;
+  margin: 0;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid #555;
+  color: #aaa;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  border-color: #e94560;
+  color: #e0e0e0;
+}
+
+.pregame-season {
+  margin-bottom: 20px;
+}
+
+.season-dropdown {
+  background: #16213e;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 16px;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.season-dropdown:hover {
+  border-color: #e94560;
+}
+
+.opponent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.opponent-card {
+  background: #16213e;
+  border: 2px solid #0f3460;
+  border-radius: 8px;
+  padding: 14px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.opponent-card:hover {
+  border-color: #e94560;
+  background: #1a2a4e;
+  transform: translateY(-2px);
+}
+
+.opponent-card.selected {
+  border-color: #e94560;
+  background: #1a2a4e;
+}
+
+.opponent-abbr {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffdd00;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 4px;
+}
+
+.opponent-name {
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.2;
+}
+
+.pitcher-loading {
+  color: #888;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.pitcher-selection {
+  margin-bottom: 24px;
+}
+
+.pitcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.pitcher-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #16213e;
+  border: 2px solid #333;
+  border-radius: 6px;
+  padding: 10px 16px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-size: 14px;
+}
+
+.pitcher-option:hover {
+  border-color: #e94560;
+}
+
+.pitcher-option.selected {
+  border-color: #e94560;
+  background: #1a1a3e;
+}
+
+.pitcher-opt-name {
+  font-weight: bold;
+}
+
+.pitcher-opt-stats {
+  font-size: 12px;
+  color: #888;
 }
 
 .play-btn {

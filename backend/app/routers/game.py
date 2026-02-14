@@ -6,6 +6,7 @@ from app.models.game_models import (
     BatActionRequest,
     GameStateResponse,
     MLBTeam,
+    PitcherInfo,
     PitchRequest,
     TeamSelectionRequest,
 )
@@ -24,11 +25,30 @@ def get_teams():
         raise HTTPException(status_code=502, detail=f"MLB API error: {e}")
 
 
+@router.get("/pitchers", response_model=list[PitcherInfo])
+def get_pitchers(team_id: int, season: int = 2024):
+    try:
+        return mlb_service.get_team_pitchers(team_id, season)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"MLB API error: {e}")
+
+
 @router.post("/new", response_model=GameStateResponse)
 def new_game(req: TeamSelectionRequest | None = None):
     team_id = req.team_id if req else None
     season = req.season if req else 2024
-    state = create_new_game(home_team_id=team_id, season=season)
+    home_pitcher_id = req.home_pitcher_id if req else None
+    away_team_id = req.away_team_id if req else None
+    away_season = req.away_season if req else None
+    away_pitcher_id = req.away_pitcher_id if req else None
+    state = create_new_game(
+        home_team_id=team_id,
+        season=season,
+        home_pitcher_id=home_pitcher_id,
+        away_team_id=away_team_id,
+        away_season=away_season,
+        away_pitcher_id=away_pitcher_id,
+    )
     return state
 
 
