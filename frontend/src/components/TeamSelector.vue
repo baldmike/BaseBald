@@ -6,22 +6,27 @@
     <div v-if="loading" class="loading">Loading teams...</div>
     <div v-if="error" class="error">{{ error }}</div>
 
-    <div v-if="teams.length" class="team-grid">
-      <div
-        v-for="team in teams"
-        :key="team.id"
-        class="team-card"
-        @click="$emit('teamSelected', team.id)"
-      >
-        <div class="team-abbr">{{ team.abbreviation }}</div>
-        <div class="team-name">{{ team.name }}</div>
+    <div v-if="teams.length" class="league-sections">
+      <div v-for="league in leagues" :key="league.name" class="league-section">
+        <h3 class="league-header">{{ league.label }}</h3>
+        <div class="team-grid">
+          <div
+            v-for="team in league.teams"
+            :key="team.id"
+            class="team-card"
+            @click="$emit('teamSelected', team.id)"
+          >
+            <div class="team-abbr">{{ team.abbreviation }}</div>
+            <div class="team-name">{{ team.name }}</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getAllTeams } from '../services/gameApi.js'
 
 defineEmits(['teamSelected'])
@@ -29,6 +34,17 @@ defineEmits(['teamSelected'])
 const teams = ref([])
 const loading = ref(false)
 const error = ref(null)
+
+const leagues = computed(() => {
+  const al = teams.value.filter(t => t.league === 'AL')
+  const nl = teams.value.filter(t => t.league === 'NL')
+  const other = teams.value.filter(t => t.league !== 'AL' && t.league !== 'NL')
+  const result = []
+  if (al.length) result.push({ name: 'AL', label: 'American League', teams: al })
+  if (nl.length) result.push({ name: 'NL', label: 'National League', teams: nl })
+  if (other.length) result.push({ name: 'other', label: 'Other', teams: other })
+  return result
+})
 
 onMounted(async () => {
   loading.value = true
@@ -60,13 +76,30 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.league-sections {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.league-section {
+  margin-bottom: 20px;
+}
+
+.league-header {
+  color: #ffdd00;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #333;
+}
+
 .team-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
-  max-height: 500px;
-  overflow-y: auto;
-  padding: 4px;
 }
 
 .team-card {
@@ -109,15 +142,15 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.team-grid::-webkit-scrollbar {
+.league-sections::-webkit-scrollbar {
   width: 6px;
 }
 
-.team-grid::-webkit-scrollbar-track {
+.league-sections::-webkit-scrollbar-track {
   background: #0f0f23;
 }
 
-.team-grid::-webkit-scrollbar-thumb {
+.league-sections::-webkit-scrollbar-thumb {
   background: #333;
   border-radius: 3px;
 }

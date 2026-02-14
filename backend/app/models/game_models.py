@@ -31,6 +31,7 @@ class MLBTeam(BaseModel):
     id: int
     name: str
     abbreviation: str
+    league: str = ""
 
 
 class PlayerInfo(BaseModel):

@@ -57,7 +57,13 @@ function playNoiseBurst(duration, highpass = 0, volume = 0.3) {
   source.stop(ctx.currentTime + duration)
 }
 
+// Shared mute state across all useSoundEffects() calls
+let muted = false
+
 export function useSoundEffects() {
+  function isMuted() { return muted }
+  function setMuted(val) { muted = val }
+  function toggleMute() { muted = !muted; return muted }
   function pitchWhoosh() {
     const ctx = getContext()
     const osc = ctx.createOscillator()
@@ -145,7 +151,7 @@ export function useSoundEffects() {
   }
 
   function playForLastPlay(lastPlay) {
-    if (!lastPlay) return
+    if (!lastPlay || muted) return
     const text = lastPlay.toLowerCase()
 
     if (text.includes('homerun') || text.includes('home run')) {
@@ -184,5 +190,8 @@ export function useSoundEffects() {
     strikeout,
     walk,
     playForLastPlay,
+    isMuted,
+    setMuted,
+    toggleMute,
   }
 }

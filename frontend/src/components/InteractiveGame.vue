@@ -5,6 +5,22 @@
       <div class="title-art">&#9918;</div>
       <h2 class="game-title">Interactive Baseball</h2>
       <TeamSelector @teamSelected="onTeamSelected" />
+
+      <div class="classic-matchups">
+        <h3 class="classic-header">Classic Matchups</h3>
+        <div class="matchup-grid">
+          <button
+            v-for="(m, i) in classicMatchups"
+            :key="i"
+            class="matchup-card"
+            @click="selectClassicMatchup(m)"
+          >
+            <div class="matchup-label">{{ m.label }}</div>
+            <div class="matchup-teams">{{ m.home.season }} {{ m.home.name }} vs {{ m.away.season }} {{ m.away.name }}</div>
+          </button>
+        </div>
+      </div>
+
       <div class="skip-select">
         <button class="skip-btn" @click="startGame()">Skip — Play without teams</button>
       </div>
@@ -63,16 +79,21 @@
         <button class="back-btn" @click="goBack">&larr; Back</button>
         <h3 class="step-label">Now pick the opponent</h3>
       </div>
-      <div class="opponent-grid">
-        <div
-          v-for="team in opponentTeams"
-          :key="team.id"
-          class="opponent-card"
-          :class="{ selected: selectedOpponentId === team.id }"
-          @click="selectedOpponentId = team.id"
-        >
-          <div class="opponent-abbr">{{ team.abbreviation }}</div>
-          <div class="opponent-name">{{ team.name }}</div>
+      <div class="opponent-leagues">
+        <div v-for="league in opponentLeagues" :key="league.name" class="opponent-league-section">
+          <h4 class="league-header">{{ league.label }}</h4>
+          <div class="opponent-grid">
+            <div
+              v-for="team in league.teams"
+              :key="team.id"
+              class="opponent-card"
+              :class="{ selected: selectedOpponentId === team.id }"
+              @click="selectedOpponentId = team.id"
+            >
+              <div class="opponent-abbr">{{ team.abbreviation }}</div>
+              <div class="opponent-name">{{ team.name }}</div>
+            </div>
+          </div>
         </div>
       </div>
       <button class="play-btn" @click="goToStep(5)" :disabled="!selectedOpponentId" style="margin-top: 20px">Next</button>
@@ -93,40 +114,61 @@
       <button class="play-btn" @click="goToStep(6)">Next</button>
     </div>
 
-    <!-- Step 6: Pick Opponent Pitcher -->
+    <!-- Step 6: Pick Pitchers (classic mode shows both, normal shows away only) -->
     <div v-if="!game && setupStep === 6" class="start-screen">
       <div class="step-header">
         <button class="back-btn" @click="goBack">&larr; Back</button>
-        <h3 class="step-label">{{ awayTeamName }} ({{ selectedAwaySeason }})</h3>
+        <h3 class="step-label" v-if="!classicMode">{{ awayTeamName }} ({{ selectedAwaySeason }})</h3>
+        <h3 class="step-label" v-else>{{ homeTeamName }} ({{ selectedSeason }}) vs {{ awayTeamName }} ({{ selectedAwaySeason }})</h3>
       </div>
 
-      <div v-if="loadingAwayPitchers" class="pitcher-loading">Loading pitchers...</div>
+      <div v-if="loadingPitchers || loadingAwayPitchers" class="pitcher-loading">Loading pitchers...</div>
 
-      <div v-else-if="awayPitcherList.length > 0" class="pitcher-selection">
-        <p>Choose the opponent's starting pitcher:</p>
-        <div class="pitcher-list">
-          <button
-            v-for="p in awayPitcherList"
-            :key="p.id"
-            class="pitcher-option"
-            :class="{ selected: selectedAwayPitcherId === p.id }"
-            @click="selectedAwayPitcherId = p.id"
-          >
-            <span class="pitcher-opt-name">{{ p.name }}</span>
-            <span class="pitcher-opt-stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
-          </button>
+      <template v-else>
+        <!-- Home pitcher selection (classic mode only) -->
+        <div v-if="classicMode && pitcherList.length > 0" class="pitcher-selection">
+          <p>Choose your starting pitcher ({{ homeTeamName }}):</p>
+          <div class="pitcher-list">
+            <button
+              v-for="p in pitcherList"
+              :key="p.id"
+              class="pitcher-option"
+              :class="{ selected: selectedPitcherId === p.id }"
+              @click="selectedPitcherId = p.id"
+            >
+              <span class="pitcher-opt-name">{{ p.name }}</span>
+              <span class="pitcher-opt-stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div v-else-if="!loadingAwayPitchers">
-        <p>No pitchers found — one will be assigned automatically.</p>
-      </div>
+        <!-- Away pitcher selection -->
+        <div v-if="awayPitcherList.length > 0" class="pitcher-selection">
+          <p>Choose the opponent's starting pitcher ({{ awayTeamName }}):</p>
+          <div class="pitcher-list">
+            <button
+              v-for="p in awayPitcherList"
+              :key="p.id"
+              class="pitcher-option"
+              :class="{ selected: selectedAwayPitcherId === p.id }"
+              @click="selectedAwayPitcherId = p.id"
+            >
+              <span class="pitcher-opt-name">{{ p.name }}</span>
+              <span class="pitcher-opt-stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!awayPitcherList.length && (!classicMode || !pitcherList.length)">
+          <p>No pitchers found — they will be assigned automatically.</p>
+        </div>
+      </template>
 
       <div class="start-actions">
-        <button class="play-btn" @click="startGame()" :disabled="loading || loadingAwayPitchers">
+        <button class="play-btn" @click="startGame()" :disabled="loading || loadingAwayPitchers || loadingPitchers">
           {{ loading ? 'Loading rosters...' : 'Play Ball!' }}
         </button>
-        <button class="play-btn simulate-btn" @click="startSimulation()" :disabled="loading || loadingAwayPitchers">
+        <button class="play-btn simulate-btn" @click="startSimulation()" :disabled="loading || loadingAwayPitchers || loadingPitchers">
           {{ loading ? 'Loading...' : 'Simulate' }}
         </button>
       </div>
@@ -134,6 +176,11 @@
 
     <!-- Active Game -->
     <div v-if="game">
+      <!-- Sound Toggle -->
+      <button class="sound-toggle" @click="onToggleSound" :title="soundMuted ? 'Unmute' : 'Mute'">
+        {{ soundMuted ? '🔇' : '🔊' }}
+      </button>
+
       <!-- Game Over Overlay -->
       <div v-if="game.game_status === 'final'" class="game-over-overlay">
         <div class="game-over-card">
@@ -169,18 +216,36 @@
         :current-batter-name="game.current_batter_name"
       />
 
-      <BaseballDiamond :bases="game.bases" />
+      <div class="field-layout">
+        <!-- Pitcher (left side) -->
+        <div class="player-card pitcher-side">
+          <img
+            v-if="currentPitcher?.id"
+            :src="headshotUrl(currentPitcher.id)"
+            :alt="currentPitcherName"
+            class="player-headshot"
+          />
+          <div class="player-card-info">
+            <span class="player-card-label">PITCHING</span>
+            <span class="player-card-name pitcher-name">{{ currentPitcherName }}</span>
+          </div>
+        </div>
 
-      <!-- Current Batter Display -->
-      <div v-if="game.current_batter_name" class="batter-display">
-        <span class="batter-label">AT BAT:</span>
-        <span class="batter-name">{{ game.current_batter_name }}</span>
-      </div>
+        <BaseballDiamond :bases="game.bases" />
 
-      <!-- Current Pitcher Display -->
-      <div v-if="currentPitcherName" class="pitcher-display">
-        <span class="pitcher-label">PITCHING:</span>
-        <span class="pitcher-name">{{ currentPitcherName }}</span>
+        <!-- Batter (right side) -->
+        <div class="player-card batter-side">
+          <img
+            v-if="currentBatter?.id"
+            :src="headshotUrl(currentBatter.id)"
+            :alt="game.current_batter_name"
+            class="player-headshot"
+          />
+          <div class="player-card-info">
+            <span class="player-card-label">AT BAT</span>
+            <span class="player-card-name batter-name-text">{{ game.current_batter_name }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- Last Play -->
@@ -276,6 +341,7 @@ const selectedAwaySeason = ref(2024)
 const loadingAwayPitchers = ref(false)
 const awayPitcherList = ref([])
 const selectedAwayPitcherId = ref(null)
+const classicMode = ref(false)
 
 // Simulation replay state
 const simulating = ref(false)
@@ -288,6 +354,18 @@ const opponentTeams = computed(() => {
   return allTeams.value.filter(t => t.id !== teamSelected.value)
 })
 
+const opponentLeagues = computed(() => {
+  const teams = opponentTeams.value
+  const al = teams.filter(t => t.league === 'AL')
+  const nl = teams.filter(t => t.league === 'NL')
+  const other = teams.filter(t => t.league !== 'AL' && t.league !== 'NL')
+  const result = []
+  if (al.length) result.push({ name: 'AL', label: 'American League', teams: al })
+  if (nl.length) result.push({ name: 'NL', label: 'National League', teams: nl })
+  if (other.length) result.push({ name: 'other', label: 'Other', teams: other })
+  return result
+})
+
 const homeTeamName = computed(() => {
   const team = allTeams.value.find(t => t.id === teamSelected.value)
   return team?.name || 'Your Team'
@@ -298,7 +376,26 @@ const awayTeamName = computed(() => {
   return team?.name || 'Opponent'
 })
 
-const { playForLastPlay } = useSoundEffects()
+const { playForLastPlay, toggleMute, isMuted } = useSoundEffects()
+const soundMuted = ref(false)
+
+function onToggleSound() {
+  toggleMute()
+  soundMuted.value = isMuted()
+}
+
+const classicMatchups = [
+  { label: 'Crosstown Classic', home: { id: 145, name: 'White Sox', season: 2005 }, away: { id: 112, name: 'Cubs', season: 2016 } },
+  { label: "Murder's Row vs Big Red Machine", home: { id: 147, name: 'Yankees', season: 1927 }, away: { id: 113, name: 'Reds', season: 1975 } },
+  { label: 'Curse Breakers', home: { id: 111, name: 'Red Sox', season: 2004 }, away: { id: 138, name: 'Cardinals', season: 2004 } },
+  { label: 'Dynasty vs 116 Wins', home: { id: 147, name: 'Yankees', season: 1998 }, away: { id: 136, name: 'Mariners', season: 2001 } },
+  { label: 'Subway Series', home: { id: 147, name: 'Yankees', season: 2000 }, away: { id: 121, name: 'Mets', season: 1969 } },
+  { label: 'Angels in the Outfield', home: { id: 108, name: 'Angels', season: 2002 }, away: { id: 147, name: 'Yankees', season: 2001 } },
+  { label: 'Coast to Coast', home: { id: 119, name: 'Dodgers', season: 2020 }, away: { id: 117, name: 'Astros', season: 2017 } },
+  { label: 'Bay Bridge Series', home: { id: 137, name: 'Giants', season: 2010 }, away: { id: 133, name: 'Athletics', season: 1972 } },
+  { label: 'Amazin\' vs Magnificent', home: { id: 121, name: 'Mets', season: 1986 }, away: { id: 111, name: 'Red Sox', season: 1986 } },
+  { label: 'Small Market Royalty', home: { id: 118, name: 'Royals', season: 2015 }, away: { id: 134, name: 'Pirates', season: 1979 } },
+]
 
 const pitchTypes = [
   { label: 'Fastball', value: 'fastball' },
@@ -308,11 +405,57 @@ const pitchTypes = [
 ]
 
 // Show the pitcher who is currently on the mound
-const currentPitcherName = computed(() => {
-  if (!game.value) return ''
-  const pitcher = game.value.is_top ? game.value.home_pitcher : game.value.away_pitcher
-  return pitcher?.name || ''
+const currentPitcher = computed(() => {
+  if (!game.value) return null
+  return game.value.is_top ? game.value.home_pitcher : game.value.away_pitcher
 })
+
+const currentPitcherName = computed(() => currentPitcher.value?.name || '')
+
+const currentBatter = computed(() => {
+  if (!game.value) return null
+  const lineup = game.value.is_top ? game.value.away_lineup : game.value.home_lineup
+  const idx = game.value.current_batter_index || 0
+  return lineup?.[idx] || null
+})
+
+function headshotUrl(playerId) {
+  if (!playerId) return ''
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${playerId}/headshot/67/current`
+}
+
+async function selectClassicMatchup(matchup) {
+  classicMode.value = true
+  teamSelected.value = matchup.home.id
+  selectedSeason.value = matchup.home.season
+  selectedOpponentId.value = matchup.away.id
+  selectedAwaySeason.value = matchup.away.season
+
+  // Jump to step 6 and load both pitcher lists
+  setupStep.value = 6
+  loadingPitchers.value = true
+  loadingAwayPitchers.value = true
+  selectedPitcherId.value = null
+  selectedAwayPitcherId.value = null
+  pitcherList.value = []
+  awayPitcherList.value = []
+
+  try {
+    const [homePitchers, awayPitchers, teams] = await Promise.all([
+      getTeamPitchers(matchup.home.id, matchup.home.season),
+      getTeamPitchers(matchup.away.id, matchup.away.season),
+      allTeams.value.length ? Promise.resolve(allTeams.value) : getAllTeams(),
+    ])
+    allTeams.value = teams
+    pitcherList.value = homePitchers
+    awayPitcherList.value = awayPitchers
+    if (homePitchers.length > 0) selectedPitcherId.value = homePitchers[0].id
+    if (awayPitchers.length > 0) selectedAwayPitcherId.value = awayPitchers[0].id
+  } finally {
+    loadingPitchers.value = false
+    loadingAwayPitchers.value = false
+  }
+}
 
 function onTeamSelected(teamId) {
   teamSelected.value = teamId
@@ -363,8 +506,12 @@ async function goToStep(step) {
 }
 
 function goBack() {
-  if (setupStep.value === 2) {
-    // Back to team selection — reset everything
+  if (classicMode.value) {
+    // From classic matchup step 6, go back to step 1
+    classicMode.value = false
+    teamSelected.value = null
+    setupStep.value = 1
+  } else if (setupStep.value === 2) {
     teamSelected.value = null
     setupStep.value = 1
   } else {
@@ -461,6 +608,7 @@ function resetGame() {
   simulating.value = false
   simSnapshots.value = []
   simReplayIndex.value = 0
+  classicMode.value = false
   game.value = null
   setupStep.value = 1
   teamSelected.value = null
@@ -642,13 +790,30 @@ watch(
   border-color: #e94560;
 }
 
+.opponent-leagues {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.opponent-league-section {
+  margin-bottom: 16px;
+}
+
+.league-header {
+  color: #ffdd00;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #333;
+}
+
 .opponent-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 4px;
 }
 
 .opponent-card {
@@ -759,46 +924,68 @@ watch(
   cursor: not-allowed;
 }
 
-/* Batter Display */
-.batter-display {
-  text-align: center;
-  padding: 8px;
+/* Field Layout with Player Headshots */
+.field-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   margin: 8px 0;
 }
 
-.batter-label {
-  font-size: 11px;
+.player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100px;
+  min-height: 120px;
+}
+
+.player-headshot {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  object-fit: cover;
+  background: #16213e;
+}
+
+.pitcher-side .player-headshot {
+  border-color: #e94560;
+}
+
+.batter-side .player-headshot {
+  border-color: #ffdd00;
+}
+
+.player-card-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.player-card-label {
+  font-size: 9px;
   color: #888;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-right: 8px;
 }
 
-.batter-name {
-  font-size: 16px;
+.player-card-name {
+  font-size: 11px;
   font-weight: bold;
-  color: #ffdd00;
-}
-
-/* Pitcher Display */
-.pitcher-display {
   text-align: center;
-  padding: 4px 8px;
-  margin-bottom: 8px;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
-.pitcher-label {
-  font-size: 11px;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-right: 8px;
-}
-
-.pitcher-name {
-  font-size: 16px;
-  font-weight: bold;
+.player-card-name.pitcher-name {
   color: #e94560;
+}
+
+.player-card-name.batter-name-text {
+  color: #ffdd00;
 }
 
 /* Game Over */
@@ -1047,5 +1234,78 @@ watch(
 .speed-btn.skip:hover:not(:disabled) {
   background: #ffdd00;
   color: #0a0a1a;
+}
+
+/* Sound Toggle */
+.sound-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 5;
+  transition: border-color 0.2s;
+}
+
+.sound-toggle:hover {
+  border-color: #e94560;
+}
+
+/* Classic Matchups */
+.classic-matchups {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #333;
+}
+
+.classic-header {
+  color: #ffdd00;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.matchup-card {
+  background: #16213e;
+  border: 2px solid #0f3460;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  color: #e0e0e0;
+}
+
+.matchup-card:hover {
+  border-color: #e94560;
+  background: #1a2a4e;
+  transform: translateY(-1px);
+}
+
+.matchup-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #e94560;
+  margin-bottom: 4px;
+}
+
+.matchup-teams {
+  font-size: 12px;
+  color: #aaa;
 }
 </style>

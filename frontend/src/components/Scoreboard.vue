@@ -1,54 +1,50 @@
 <template>
   <div class="scoreboard">
-    <div class="score-grid">
-      <table>
-        <thead>
-          <tr>
-            <th class="team-col"></th>
-            <th
-              v-for="(_, i) in totalInnings"
-              :key="i"
-              :class="{ active: i === inning - 1 }"
-            >
-              {{ i + 1 }}
-            </th>
-            <th class="total-col">R</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="team-col">{{ awayTeamName || 'AWAY' }}</td>
-            <td
-              v-for="(runs, i) in awayScore"
-              :key="'a' + i"
-              :class="{ active: i === inning - 1 && isTop }"
-            >
-              {{ i < inning || (i === inning - 1 && isTop) ? runs : '' }}
-            </td>
-            <td class="total-col">{{ awayTotal }}</td>
-          </tr>
-          <tr>
-            <td class="team-col">{{ homeTeamName || 'HOME' }}</td>
-            <td
-              v-for="(runs, i) in homeScore"
-              :key="'h' + i"
-              :class="{ active: i === inning - 1 && !isTop }"
-            >
-              {{ i < inning - 1 || (i === inning - 1 && !isTop) ? runs : '' }}
-            </td>
-            <td class="total-col">{{ homeTotal }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="score-grid" :style="gridStyle">
+      <!-- Header row -->
+      <div class="cell team-col header"></div>
+      <div
+        v-for="(_, i) in totalInnings"
+        :key="'h' + i"
+        class="cell header"
+        :class="{ active: i === inning - 1 }"
+      >
+        {{ i + 1 }}
+      </div>
+      <div class="cell header total-col">R</div>
+
+      <!-- Away row -->
+      <div class="cell team-col">{{ awayTeamName || 'AWAY' }}</div>
+      <div
+        v-for="(runs, i) in awayScore"
+        :key="'a' + i"
+        class="cell"
+        :class="{ active: i === inning - 1 && isTop }"
+      >
+        {{ i < inning || (i === inning - 1 && isTop) ? runs : '' }}
+      </div>
+      <div class="cell total-col">{{ awayTotal }}</div>
+
+      <!-- Home row -->
+      <div class="cell team-col">{{ homeTeamName || 'HOME' }}</div>
+      <div
+        v-for="(runs, i) in homeScore"
+        :key="'hm' + i"
+        class="cell"
+        :class="{ active: i === inning - 1 && !isTop }"
+      >
+        {{ i < inning - 1 || (i === inning - 1 && !isTop) ? runs : '' }}
+      </div>
+      <div class="cell total-col">{{ homeTotal }}</div>
     </div>
 
     <div class="game-info">
       <div class="count-display">
         <div class="info-label">COUNT</div>
         <div class="count-numbers">
-          <span class="balls">{{ balls }}</span>
+          <span class="balls-val">{{ balls }}</span>
           <span class="separator">-</span>
-          <span class="strikes">{{ strikes }}</span>
+          <span class="strikes-val">{{ strikes }}</span>
         </div>
         <div class="count-labels">
           <span>B</span><span></span><span>S</span>
@@ -69,11 +65,6 @@
           <span class="arrow">{{ isTop ? '▲' : '▼' }}</span>
           {{ inning }}
         </div>
-      </div>
-
-      <div v-if="currentBatterName" class="at-bat-display">
-        <div class="info-label">AT BAT</div>
-        <div class="at-bat-name">{{ currentBatterName }}</div>
       </div>
     </div>
   </div>
@@ -98,6 +89,10 @@ const props = defineProps({
 })
 
 const totalInnings = computed(() => props.awayScore.length)
+
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `60px repeat(${totalInnings.value}, 1fr) 40px`,
+}))
 </script>
 
 <style scoped>
@@ -110,46 +105,48 @@ const totalInnings = computed(() => props.awayScore.length)
 }
 
 .score-grid {
+  display: grid;
+  gap: 0;
   overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: center;
   font-family: 'Courier New', monospace;
 }
 
-th, td {
-  padding: 4px 8px;
-  min-width: 28px;
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
   font-size: 14px;
+  color: #e0e0e0;
+  border-bottom: 1px solid #1a1a2e;
+  min-width: 0;
 }
 
-th {
+.cell.header {
   color: #888;
+  font-size: 12px;
   border-bottom: 1px solid #333;
 }
 
-td {
-  color: #e0e0e0;
-}
-
-.team-col {
-  text-align: left;
+.cell.team-col {
+  justify-content: flex-start;
   font-weight: bold;
   color: #e94560;
-  min-width: 50px;
+  font-size: 13px;
+  padding-left: 6px;
 }
 
-.total-col {
+.cell.team-col.header {
+  color: #888;
+}
+
+.cell.total-col {
   font-weight: bold;
   color: #ffdd00;
   border-left: 2px solid #333;
-  min-width: 30px;
 }
 
-.active {
+.cell.active {
   background: rgba(233, 69, 96, 0.15);
 }
 
@@ -180,11 +177,11 @@ td {
   font-family: 'Courier New', monospace;
 }
 
-.balls {
+.balls-val {
   color: #4caf50;
 }
 
-.strikes {
+.strikes-val {
   color: #e94560;
 }
 
@@ -238,19 +235,5 @@ td {
 .arrow {
   font-size: 14px;
   color: #e94560;
-}
-
-.at-bat-display {
-  text-align: center;
-}
-
-.at-bat-name {
-  font-size: 13px;
-  font-weight: bold;
-  color: #ffdd00;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

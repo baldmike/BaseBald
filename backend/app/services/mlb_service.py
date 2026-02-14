@@ -74,10 +74,13 @@ def get_all_teams():
     data = statsapi.get("teams", {"sportIds": 1})
     teams = []
     for team in data.get("teams", []):
+        league = team.get("league", {})
+        league_name = league.get("name", "")
         teams.append({
             "id": team["id"],
             "name": team["name"],
             "abbreviation": team.get("abbreviation", ""),
+            "league": "AL" if "American" in league_name else "NL" if "National" in league_name else "",
         })
     teams.sort(key=lambda t: t["name"])
     return teams
