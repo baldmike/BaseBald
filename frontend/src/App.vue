@@ -21,14 +21,12 @@
             <span class="header-subtitle">Powered by real MLB rosters &amp; stats</span>
           </div>
         </div>
-        <div class="header-center">
+        <nav class="nav-tabs">
           <button
             v-if="activeTab === 'play' && gameRef?.showBackButton"
-            class="header-back-btn"
+            class="nav-tab"
             @click="gameRef.handleBack()"
           >&larr; Back</button>
-        </div>
-        <nav class="nav-tabs">
           <button
             class="nav-tab"
             :class="{ active: activeTab === 'play' }"
@@ -89,29 +87,6 @@ body {
   justify-content: space-between;
 }
 
-.header-center {
-  min-width: 80px;
-  display: flex;
-  justify-content: center;
-}
-
-.header-back-btn {
-  background: none;
-  border: 1px solid #555;
-  color: #aaa;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.header-back-btn:hover {
-  border-color: #e94560;
-  color: #e0e0e0;
-}
-
 .header-logo {
   display: flex;
   align-items: center;
@@ -147,29 +122,21 @@ body {
 
 .nav-tabs {
   display: flex;
-  gap: 0;
+  gap: 8px;
 }
 
 .nav-tab {
   background: transparent;
   border: 2px solid #e94560;
   color: #e94560;
-  padding: 8px 24px;
-  min-width: 120px;
+  padding: 6px 14px;
+  min-width: 90px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   transition: all 0.2s;
-}
-
-.nav-tab:first-child {
-  border-radius: 6px 0 0 6px;
-  border-right: 1px solid #e94560;
-}
-
-.nav-tab:last-child {
-  border-radius: 0 6px 6px 0;
-  border-left: 1px solid #e94560;
+  text-align: center;
 }
 
 .nav-tab:hover:not(.active) {
