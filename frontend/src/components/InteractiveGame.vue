@@ -884,6 +884,7 @@ const classicMatchups = [
   { label: 'Mr. October', home: { id: 147, name: 'Yankees', season: 1977 }, away: { id: 119, name: 'Dodgers', season: 1977 } },
   { label: "Babe Ruth's Called Shot", home: { id: 112, name: 'Cubs', season: 1932 }, away: { id: 147, name: 'Yankees', season: 1932 } },
   { label: "Bill Buckner's Legs", home: { id: 121, name: 'Mets', season: 1986 }, away: { id: 111, name: 'Red Sox', season: 1986 } },
+  { label: 'The Sweep', home: { id: 117, name: 'Astros', season: 2005, pitcherId: 407840 }, away: { id: 145, name: 'White Sox', season: 2005, pitcherId: 150119 } },
 ]
 
 /**
@@ -1017,9 +1018,17 @@ async function selectClassicMatchup(matchup) {
     allTeams.value = teams
     pitcherList.value = homePitchers
     awayPitcherList.value = awayPitchers
-    // Auto-select the first pitcher in each list as a sensible default
-    if (homePitchers.length > 0) selectedPitcherId.value = homePitchers[0].id
-    if (awayPitchers.length > 0) selectedAwayPitcherId.value = awayPitchers[0].id
+    // Auto-select the specified pitcher if provided, otherwise default to first (best ERA)
+    if (matchup.home.pitcherId && homePitchers.some(p => p.id === matchup.home.pitcherId)) {
+      selectedPitcherId.value = matchup.home.pitcherId
+    } else if (homePitchers.length > 0) {
+      selectedPitcherId.value = homePitchers[0].id
+    }
+    if (matchup.away.pitcherId && awayPitchers.some(p => p.id === matchup.away.pitcherId)) {
+      selectedAwayPitcherId.value = matchup.away.pitcherId
+    } else if (awayPitchers.length > 0) {
+      selectedAwayPitcherId.value = awayPitchers[0].id
+    }
   } finally {
     loadingPitchers.value = false
     loadingAwayPitchers.value = false
