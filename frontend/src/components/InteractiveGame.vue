@@ -46,12 +46,12 @@
             @click="selectClassicMatchup(m)"
           >
             <div class="matchup-logos">
-              <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
-              <span class="matchup-vs">vs</span>
               <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
+              <span class="matchup-vs">vs</span>
+              <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
             </div>
             <div class="matchup-label">{{ m.label }}</div>
-            <div class="matchup-teams">{{ m.home.season }} {{ m.home.name }} vs {{ m.away.season }} {{ m.away.name }}</div>
+            <div class="matchup-teams">{{ m.away.season }} {{ m.away.name }} vs {{ m.home.season }} {{ m.home.name }}</div>
           </button>
         </div>
       </div>
@@ -877,6 +877,13 @@ const classicMatchups = [
   { label: 'Freeway Series', home: { id: 119, name: 'Dodgers', season: 1988 }, away: { id: 108, name: 'Angels', season: 2002 } },
   { label: 'Braves vs Twins', home: { id: 144, name: 'Braves', season: 1995 }, away: { id: 142, name: 'Twins', season: 1991 } },
   { label: 'Sammy Sosa Corked Bat Game', home: { id: 112, name: 'Cubs', season: 2003 }, away: { id: 139, name: 'Devil Rays', season: 2003 } },
+  { label: "Don Larsen's Perfect Game", home: { id: 147, name: 'Yankees', season: 1956 }, away: { id: 119, name: 'Dodgers', season: 1956 } },
+  { label: "Hank Aaron's 715th Home Run", home: { id: 144, name: 'Braves', season: 1974 }, away: { id: 119, name: 'Dodgers', season: 1974 } },
+  { label: "McGwire's 62nd Home Run", home: { id: 138, name: 'Cardinals', season: 1998 }, away: { id: 112, name: 'Cubs', season: 1998 } },
+  { label: "Buehrle's Perfect Game", home: { id: 145, name: 'White Sox', season: 2009 }, away: { id: 139, name: 'Rays', season: 2009 } },
+  { label: 'Mr. October', home: { id: 147, name: 'Yankees', season: 1977 }, away: { id: 119, name: 'Dodgers', season: 1977 } },
+  { label: "Babe Ruth's Called Shot", home: { id: 112, name: 'Cubs', season: 1932 }, away: { id: 147, name: 'Yankees', season: 1932 } },
+  { label: "Bill Buckner's Legs", home: { id: 121, name: 'Mets', season: 1986 }, away: { id: 111, name: 'Red Sox', season: 1986 } },
 ]
 
 /**
