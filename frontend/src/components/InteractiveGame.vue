@@ -254,10 +254,6 @@
       For custom/fantasy games, defaults to "Clear Skies".
     -->
     <div v-if="!game && setupStep === 5" class="start-screen">
-      <div class="step-header">
-        <h3 class="step-label">Game Day Weather</h3>
-      </div>
-
       <div class="venue-selection" v-if="homeVenue || awayVenue">
         <p>Choose the ballpark:</p>
         <div class="venue-grid">
@@ -1922,11 +1918,7 @@ defineExpose({ showBackButton, handleBack, isPlaying })
    Generous padding creates visual breathing room for the form elements. */
 .start-screen {
   text-align: center;
-  padding: 60px 20px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  padding: 40px 20px;
 }
 
 /* Heading within wizard steps */
@@ -3200,7 +3192,7 @@ defineExpose({ showBackButton, handleBack, isPlaying })
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 32px auto 0;
+  margin: 0 auto;
   padding: 0 16px;
 }
 
