@@ -93,12 +93,14 @@
               class="matchup-card"
               @click="selectClassicMatchup(m)"
             >
+              <span class="matchup-number">#{{ i + 1 }}</span>
               <div class="matchup-logos">
                 <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
                 <span class="matchup-vs">vs</span>
                 <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
               </div>
               <div class="matchup-label">{{ m.label }}</div>
+              <div class="matchup-subtitle" v-if="m.subtitle">{{ m.subtitle }}</div>
               <div class="matchup-teams">{{ m.away.season }} {{ m.away.name }} vs {{ m.home.season }} {{ m.home.name }}</div>
               <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
             </button>
@@ -1023,21 +1025,21 @@ const historicalMatchups = [
 ]
 
 const fantasyMatchups = [
-  { label: 'Crosstown Classic', home: { id: 145, name: 'White Sox', season: 2005, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
-  { label: "Murderer's Row vs Rookie Ichiro 116", home: { id: 147, name: 'Yankees', season: 1927, pitcherId: 116241, pitcherName: 'Waite Hoyt' }, away: { id: 136, name: 'Mariners', season: 2001, pitcherId: 114587, pitcherName: 'Freddy Garcia' } },
-  { label: 'Curse Breakers', home: { id: 111, name: 'Red Sox', season: 2004, pitcherId: 121811, pitcherName: 'Curt Schilling' }, away: { id: 138, name: 'Cardinals', season: 2004, pitcherId: 452764, pitcherName: 'Chris Carpenter' } },
-  { label: 'Dynasty vs 116 Wins', home: { id: 147, name: 'Yankees', season: 1998, pitcherId: 112552, pitcherName: 'David Cone' }, away: { id: 136, name: 'Mariners', season: 2001, pitcherId: 114587, pitcherName: 'Freddy Garcia' } },
-  { label: 'Subway Series', home: { id: 147, name: 'Yankees', season: 2000, pitcherId: 112388, pitcherName: 'Roger Clemens' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
-  { label: 'Angels in the Outfield', home: { id: 108, name: 'Angels', season: 2002, pitcherId: 132220, pitcherName: 'Jarrod Washburn' }, away: { id: 147, name: 'Yankees', season: 2001, pitcherId: 119608, pitcherName: 'Mike Mussina' } },
-  { label: 'Coast to Coast', home: { id: 119, name: 'Dodgers', season: 2020, pitcherId: 621111, pitcherName: 'Walker Buehler' }, away: { id: 117, name: 'Astros', season: 2017, pitcherId: 434378, pitcherName: 'Justin Verlander' } },
-  { label: 'Bay Bridge Series', home: { id: 137, name: 'Giants', season: 2010, pitcherId: 453311, pitcherName: 'Tim Lincecum' }, away: { id: 133, name: 'Athletics', season: 1972, pitcherId: 116334, pitcherName: 'Catfish Hunter' } },
-  { label: 'Amazin\' vs Magnificent', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 114947, pitcherName: 'Dwight Gooden' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
-  { label: 'Small Market Royalty', home: { id: 118, name: 'Royals', season: 2015, pitcherId: 450172, pitcherName: 'Edinson Volquez' }, away: { id: 134, name: 'Pirates', season: 1979, pitcherId: 111952, pitcherName: 'John Candelaria' } },
-  { label: "Bizarro '69 World Series", home: { id: 158, name: 'Pilots', season: 1969, pitcherId: 111279, pitcherName: 'Jim Bouton' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
-  { label: 'Freeway Series', home: { id: 119, name: 'Dodgers', season: 1988, pitcherId: 115861, pitcherName: 'Orel Hershiser' }, away: { id: 108, name: 'Angels', season: 2002, pitcherId: 132220, pitcherName: 'Jarrod Washburn' } },
-  { label: 'Braves vs Twins', home: { id: 144, name: 'Braves', season: 1995, pitcherId: 118120, pitcherName: 'Greg Maddux' }, away: { id: 142, name: 'Twins', season: 1991, pitcherId: 119399, pitcherName: 'Jack Morris' } },
-  { label: 'Battle for The Bottom', home: { id: 145, name: 'White Sox', season: 2024, pitcherId: 676979, pitcherName: 'Garrett Crochet' }, away: { id: 121, name: 'Mets', season: 1962, pitcherId: 112783, pitcherName: 'Roger Craig' } },
-  { label: 'Pitching Duel', home: { id: 138, name: 'Cardinals', season: 1968, pitcherId: 114756, pitcherName: 'Bob Gibson' }, away: { id: 119, name: 'Dodgers', season: 1963, pitcherId: 117277, pitcherName: 'Sandy Koufax' } },
+  { label: 'Crosstown Classic', subtitle: 'Getcher pops from da Jewels, grab a seat in the frunchroom and watch your team win by a couple two tree.', home: { id: 145, name: 'White Sox', season: 2005, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
+  { label: 'Coast to Coast', subtitle: 'Mantle vs Ohtani', home: { id: 119, name: 'Dodgers', season: 2024, pitcherId: 808967, pitcherName: 'Yoshinobu Yamamoto' }, away: { id: 147, name: 'Yankees', season: 1956, pitcherId: 114299, pitcherName: 'Whitey Ford' } },
+  { label: "Bizarro '69 World Series", subtitle: 'The Seattle Pilots: What a Year.', home: { id: 158, name: 'Pilots', season: 1969, pitcherId: 111279, pitcherName: 'Jim Bouton' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
+  { label: 'Pitching Duel', subtitle: 'Old School Duel', home: { id: 138, name: 'Cardinals', season: 1968, pitcherId: 114756, pitcherName: 'Bob Gibson' }, away: { id: 119, name: 'Dodgers', season: 1963, pitcherId: 117277, pitcherName: 'Sandy Koufax' } },
+  { label: "Big Red Machine vs Murderer's Row", subtitle: "You've waited long enough.", home: { id: 147, name: 'Yankees', season: 1927, pitcherId: 116241, pitcherName: 'Waite Hoyt' }, away: { id: 113, name: 'Reds', season: 1975, pitcherId: 115239, pitcherName: 'Don Gullett' } },
+  { label: 'Battle for The Bottom', subtitle: 'Worst of the Worst', home: { id: 145, name: 'White Sox', season: 2024, pitcherId: 676979, pitcherName: 'Garrett Crochet' }, away: { id: 121, name: 'Mets', season: 1962, pitcherId: 112783, pitcherName: 'Roger Craig' } },
+  { label: 'Subway Series', subtitle: "New York's Finest", home: { id: 147, name: 'Yankees', season: 1998, pitcherId: 112388, pitcherName: 'Roger Clemens' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
+  { label: 'Rookie Dual', subtitle: 'Fernando Valenzuela vs Albert Pujols', home: { id: 138, name: 'Cardinals', season: 2001, pitcherId: 119403, pitcherName: 'Matt Morris' }, away: { id: 119, name: 'Dodgers', season: 1981, pitcherId: 123619, pitcherName: 'Fernando Valenzuela' } },
+  { label: 'Bay Bridge Series', subtitle: 'Bash Brothers vs Say Hey Kid', home: { id: 137, name: 'Giants', season: 1962, pitcherId: 118283, pitcherName: 'Juan Marichal' }, away: { id: 133, name: 'Athletics', season: 1989, pitcherId: 122775, pitcherName: 'Dave Stewart' } },
+  { label: 'Freeway Series', subtitle: 'SoCal Battle between Gwynn and Nolan Ryan', home: { id: 135, name: 'Padres', season: 1984, pitcherId: 122197, pitcherName: 'Eric Show' }, away: { id: 108, name: 'Angels', season: 1979, pitcherId: 121597, pitcherName: 'Nolan Ryan' } },
+  { label: '116', subtitle: 'Tied for Most Wins', home: { id: 112, name: 'Cubs', season: 1906, pitcherId: 111577, pitcherName: 'Mordecai Brown' }, away: { id: 136, name: 'Mariners', season: 2001, pitcherId: 114587, pitcherName: 'Freddy Garcia' } },
+  { label: 'Cursed/Blessed', subtitle: 'One curse closes, another one opens', home: { id: 111, name: 'Red Sox', season: 2004, pitcherId: 121811, pitcherName: 'Curt Schilling' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
+  { label: 'Moneyball vs Big Spenders', subtitle: 'Small Budget, Big Dreams', home: { id: 133, name: 'Athletics', season: 2002, pitcherId: 217096, pitcherName: 'Barry Zito' }, away: { id: 140, name: 'Rangers', season: 2023, pitcherId: 453286, pitcherName: 'Max Scherzer' } },
+  { label: 'The Revenge Match', subtitle: 'Pirates Beat Orioles 1971 WS', home: { id: 110, name: 'Orioles', season: 1971, pitcherId: 120196, pitcherName: 'Jim Palmer' }, away: { id: 134, name: 'Pirates', season: 1979, pitcherId: 111952, pitcherName: 'John Candelaria' } },
+  { label: 'North of the Border', subtitle: "Canada's Finest", home: { id: 141, name: 'Blue Jays', season: 1993, pitcherId: 115267, pitcherName: 'Juan Guzman' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
 ]
 
 /**
@@ -2757,6 +2759,7 @@ defineExpose({ showBackButton, handleBack, isPlaying })
 
 /* Individual matchup card — left-aligned text for readability of longer labels */
 .matchup-card {
+  position: relative;
   background: #ffffff;
   border: 2px solid #ddd;
   border-radius: 8px;
@@ -2765,6 +2768,15 @@ defineExpose({ showBackButton, handleBack, isPlaying })
   transition: all 0.2s;
   text-align: left;
   color: #222;
+}
+
+.matchup-number {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #999;
 }
 
 /* Matchup card hover: red border + subtle lift */
