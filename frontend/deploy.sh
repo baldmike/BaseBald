@@ -1,4 +1,8 @@
 #!/bin/bash
+set -e
+echo "Running tests..."
+npm test
+echo "Tests passed! Building..."
 npm run build
 cd dist
 git add .
