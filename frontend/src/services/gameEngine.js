@@ -365,6 +365,8 @@ function _snapshot(state) {
  * Resets pitch count, initializes new pitcher stats, logs the change.
  */
 export function switchPitcher(state, side, newPitcher) {
+  const isHome = side === 'home'
+  newPitcher.activeStats = (isHome ? newPitcher.splits?.home : newPitcher.splits?.away) || newPitcher.stats
   const oldPitcher = state[side + '_pitcher']
   state[side + '_pitcher'] = newPitcher
   state[side + '_pitch_count'] = 0
@@ -464,6 +466,22 @@ export async function createNewGame({
           ? awayRelievers
           : awayPitchers.filter((p) => p.id !== state.away_pitcher.id)
 
+        // Resolve activeStats based on home/away splits
+        for (const batter of state.home_lineup) {
+          batter.activeStats = batter.splits?.home || batter.stats
+        }
+        for (const batter of state.away_lineup) {
+          batter.activeStats = batter.splits?.away || batter.stats
+        }
+        state.home_pitcher.activeStats = state.home_pitcher.splits?.home || state.home_pitcher.stats
+        state.away_pitcher.activeStats = state.away_pitcher.splits?.away || state.away_pitcher.stats
+        for (const p of state.home_bullpen) {
+          p.activeStats = p.splits?.home || p.stats
+        }
+        for (const p of state.away_bullpen) {
+          p.activeStats = p.splits?.away || p.stats
+        }
+
         _getCurrentBatter(state)
 
         // Initialize box scores
@@ -508,10 +526,10 @@ export function processPitch(state, pitchType) {
   }
 
   const batter = _getCurrentBatter(state)
-  const playerStats = batter?.stats || null
+  const playerStats = batter?.activeStats || batter?.stats || null
   const batterName = batter?.name || 'Batter'
   const pitcher = state.home_pitcher
-  const pitcherStats = pitcher?.stats || null
+  const pitcherStats = pitcher?.activeStats || pitcher?.stats || null
 
   const swings = cpuDecidesSwing()
   const outcome = determineOutcome(pitchType, swings, playerStats, pitcherStats, state.weather, state.home_pitch_count)
@@ -535,9 +553,9 @@ export function processAtBat(state, action) {
   }
 
   const batter = _getCurrentBatter(state)
-  const playerStats = batter?.stats || null
+  const playerStats = batter?.activeStats || batter?.stats || null
   const pitcher = state.away_pitcher
-  const pitcherStats = pitcher?.stats || null
+  const pitcherStats = pitcher?.activeStats || pitcher?.stats || null
 
   const pitchType = cpuPicksPitch()
   const swings = action === 'swing'
@@ -671,10 +689,10 @@ export function simulateGame(state) {
       _maybeSimSteal(state)
       if (state.outs >= 3) { snapshots.push(_snapshot(state)); continue }
       const batter = _getCurrentBatter(state)
-      const playerStats = batter?.stats || null
+      const playerStats = batter?.activeStats || batter?.stats || null
       const batterName = batter?.name || 'Batter'
       const pitcher = state.home_pitcher
-      const pitcherStats = pitcher?.stats || null
+      const pitcherStats = pitcher?.activeStats || pitcher?.stats || null
 
       const pitchType = cpuPicksPitch()
       const swings = cpuDecidesSwing()
@@ -687,9 +705,9 @@ export function simulateGame(state) {
       _maybeSimSteal(state)
       if (state.outs >= 3) { snapshots.push(_snapshot(state)); continue }
       const batter = _getCurrentBatter(state)
-      const playerStats = batter?.stats || null
+      const playerStats = batter?.activeStats || batter?.stats || null
       const pitcher = state.away_pitcher
-      const pitcherStats = pitcher?.stats || null
+      const pitcherStats = pitcher?.activeStats || pitcher?.stats || null
 
       const pitchType = cpuPicksPitch()
       const swings = cpuDecidesSwing()

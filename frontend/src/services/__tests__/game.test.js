@@ -194,4 +194,44 @@ describe('gameEngine', () => {
     expect(state.home_pitcher_stats.id).toBe(99)
     expect(state.play_log.at(-1)).toMatch(/Pitching change/)
   })
+
+  // ──────────────────────────────────────────────
+  // TEST 11: home batters use home splits when available
+  // ──────────────────────────────────────────────
+  it('processPitch uses home splits for away batters (CPU) when available', () => {
+    const state = makeGameState()
+    const awaySplitStats = { avg: 0.210, slg: 0.320, k_rate: 0.280, hr_rate: 0.020 }
+    // Away batters should use away splits (they're the away team)
+    for (const batter of state.away_lineup) {
+      batter.splits = { home: { avg: 0.350, slg: 0.600, k_rate: 0.100, hr_rate: 0.060 }, away: awaySplitStats }
+      batter.activeStats = batter.splits.away
+    }
+    // Verify the active stats are the away split, not season stats
+    const firstBatter = state.away_lineup[0]
+    expect(firstBatter.activeStats.avg).toBe(0.210)
+    expect(firstBatter.activeStats).toBe(awaySplitStats)
+    expect(firstBatter.activeStats).not.toBe(firstBatter.stats)
+    // processPitch should still work
+    processPitch(state, 'fastball')
+    expect(state.home_pitch_count).toBe(1)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 12: falls back to season stats when splits are null
+  // ──────────────────────────────────────────────
+  it('falls back to season stats when splits are unavailable', () => {
+    const state = makeGameState()
+    // Set splits to null (no split data available)
+    for (const batter of state.away_lineup) {
+      batter.splits = null
+      batter.activeStats = batter.splits?.away || batter.stats
+    }
+    const firstBatter = state.away_lineup[0]
+    // activeStats should fall back to season stats
+    expect(firstBatter.activeStats).toBe(firstBatter.stats)
+    expect(firstBatter.activeStats.avg).toBe(0.280)
+    // Game should still work normally
+    processPitch(state, 'curveball')
+    expect(state.home_pitch_count).toBe(1)
+  })
 })

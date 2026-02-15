@@ -178,6 +178,61 @@ export async function getPlayerHittingStats(playerId, season = 2024, sportId = 1
   return defaults
 }
 
+/** Fetch a player's home/away hitting splits for a given season. */
+export async function getPlayerHittingSplits(playerId, season = 2024, sportId = 1) {
+  try {
+    const data = await mlbFetch(
+      `/api/v1/people/${playerId}/stats?stats=homeAndAway&group=hitting&season=${season}&sportId=${sportId}`
+    )
+    const result = { home: null, away: null }
+    for (const split of data.stats?.[0]?.splits || []) {
+      const s = split.stat || {}
+      const atBats = parseInt(s.atBats || '0', 10)
+      const plateAppearances = parseInt(s.plateAppearances || '0', 10)
+      if (atBats < 20) continue
+      const stats = {
+        avg: parseFloat(s.avg || '0'),
+        slg: parseFloat(s.slg || '0'),
+        k_rate: plateAppearances > 0
+          ? parseInt(s.strikeOuts || '0', 10) / plateAppearances
+          : 0.230,
+        hr_rate: atBats > 0
+          ? parseInt(s.homeRuns || '0', 10) / atBats
+          : 0.030,
+      }
+      if (split.isHome) result.home = stats
+      else result.away = stats
+    }
+    return result
+  } catch { /* fall through */ }
+  return { home: null, away: null }
+}
+
+/** Fetch a player's home/away pitching splits for a given season. */
+export async function getPlayerPitchingSplits(playerId, season = 2024, sportId = 1) {
+  try {
+    const data = await mlbFetch(
+      `/api/v1/people/${playerId}/stats?stats=homeAndAway&group=pitching&season=${season}&sportId=${sportId}`
+    )
+    const result = { home: null, away: null }
+    for (const split of data.stats?.[0]?.splits || []) {
+      const s = split.stat || {}
+      const ipStr = s.inningsPitched || '0'
+      const innings = parseFloat(ipStr.replace('.', '')) || 0
+      if (innings < 10) continue
+      const stats = {
+        era: parseFloat(s.era || '4.30'),
+        k_per_9: parseFloat(s.strikeoutsPer9Inn || '8.20'),
+        bb_per_9: parseFloat(s.walksPer9Inn || '3.20'),
+      }
+      if (split.isHome) result.home = stats
+      else result.away = stats
+    }
+    return result
+  } catch { /* fall through */ }
+  return { home: null, away: null }
+}
+
 /** Fetch a player's pitching stats for a given season. */
 export async function getPlayerPitchingStats(playerId, season = 2024, sportId = 1) {
   const defaults = { era: 4.30, k_per_9: 8.20, bb_per_9: 3.20, gamesStarted: 0, gamesPlayed: 0 }
@@ -231,11 +286,19 @@ export async function getTeamLineup(teamId, season = 2024) {
       })
     }
 
-    // Fetch hitting stats for each position player
+    // Fetch hitting stats and home/away splits for each position player
     await Promise.all(positionPlayers.map(async (player) => {
-      player.stats = player.id
-        ? await getPlayerHittingStats(player.id, season, sportId)
-        : { ...defaults }
+      if (player.id) {
+        const [stats, splits] = await Promise.all([
+          getPlayerHittingStats(player.id, season, sportId),
+          getPlayerHittingSplits(player.id, season, sportId),
+        ])
+        player.stats = stats
+        player.splits = (splits.home || splits.away) ? splits : null
+      } else {
+        player.stats = { ...defaults }
+        player.splits = null
+      }
     }))
 
     const ops = (p) => (p.stats.avg || 0) + (p.stats.slg || 0)
@@ -292,6 +355,7 @@ export async function getTeamLineup(teamId, season = 2024) {
         name: `Player ${lineup.length + 1}`,
         position: 'UT',
         stats: { ...defaults },
+        splits: null,
       })
     }
 
@@ -302,6 +366,7 @@ export async function getTeamLineup(teamId, season = 2024) {
       name: `Player ${i + 1}`,
       position: 'UT',
       stats: { avg: 0.245, slg: 0.395, k_rate: 0.230, hr_rate: 0.030 },
+      splits: null,
     }))
   }
 }
@@ -325,11 +390,19 @@ export async function getTeamPitchers(teamId, season = 2024) {
       })
     }
 
-    // Fetch pitching stats in parallel
+    // Fetch pitching stats and home/away splits in parallel
     await Promise.all(pitchers.map(async (p) => {
-      p.stats = p.id
-        ? await getPlayerPitchingStats(p.id, season, sportId)
-        : { ...defaultStats }
+      if (p.id) {
+        const [stats, splits] = await Promise.all([
+          getPlayerPitchingStats(p.id, season, sportId),
+          getPlayerPitchingSplits(p.id, season, sportId),
+        ])
+        p.stats = stats
+        p.splits = (splits.home || splits.away) ? splits : null
+      } else {
+        p.stats = { ...defaultStats }
+        p.splits = null
+      }
     }))
 
     // Classify each pitcher as SP or RP based on games started ratio
