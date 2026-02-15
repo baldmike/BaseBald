@@ -6,6 +6,13 @@
 const MLB_BASE = 'https://statsapi.mlb.com'
 const CORS_PROXY = 'https://corsproxy.io/?url='
 
+/** Minor league team IDs mapped to their sportId (for stats queries). */
+const MINOR_LEAGUE_TEAMS = { 247: 12 } // Birmingham Barons = Double-A
+
+function sportIdForTeam(teamId) {
+  return MINOR_LEAGUE_TEAMS[teamId] || 1
+}
+
 async function mlbFetch(path) {
   const url = `${CORS_PROXY}${encodeURIComponent(`${MLB_BASE}${path}`)}`
   const res = await fetch(url)
@@ -129,6 +136,11 @@ export async function getAllTeams(season = null) {
         league,
       })
     }
+    // Easter egg: include the 1994 AA Birmingham Barons (Michael Jordan's team)
+    if (season === 1994) {
+      teams.push({ id: 247, name: 'Birmingham Barons (AA)', abbreviation: 'BIR', league: '' })
+    }
+
     teams.sort((a, b) => a.name.localeCompare(b.name))
     return teams
   } catch {
@@ -137,11 +149,11 @@ export async function getAllTeams(season = null) {
 }
 
 /** Fetch a player's hitting stats for a given season. */
-export async function getPlayerHittingStats(playerId, season = 2024) {
+export async function getPlayerHittingStats(playerId, season = 2024, sportId = 1) {
   const defaults = { avg: 0.245, slg: 0.395, k_rate: 0.230, hr_rate: 0.030 }
   try {
     const data = await mlbFetch(
-      `/api/v1/people/${playerId}/stats?stats=season&group=hitting&season=${season}&sportId=1`
+      `/api/v1/people/${playerId}/stats?stats=season&group=hitting&season=${season}&sportId=${sportId}`
     )
     for (const split of data.stats?.[0]?.splits || []) {
       const s = split.stat || {}
@@ -164,11 +176,11 @@ export async function getPlayerHittingStats(playerId, season = 2024) {
 }
 
 /** Fetch a player's pitching stats for a given season. */
-export async function getPlayerPitchingStats(playerId, season = 2024) {
-  const defaults = { era: 4.30, k_per_9: 8.20, bb_per_9: 3.20 }
+export async function getPlayerPitchingStats(playerId, season = 2024, sportId = 1) {
+  const defaults = { era: 4.30, k_per_9: 8.20, bb_per_9: 3.20, gamesStarted: 0, gamesPlayed: 0 }
   try {
     const data = await mlbFetch(
-      `/api/v1/people/${playerId}/stats?stats=season&group=pitching&season=${season}&sportId=1`
+      `/api/v1/people/${playerId}/stats?stats=season&group=pitching&season=${season}&sportId=${sportId}`
     )
     for (const split of data.stats?.[0]?.splits || []) {
       const s = split.stat || {}
@@ -179,6 +191,8 @@ export async function getPlayerPitchingStats(playerId, season = 2024) {
         era: parseFloat(s.era || defaults.era),
         k_per_9: parseFloat(s.strikeoutsPer9Inn || defaults.k_per_9),
         bb_per_9: parseFloat(s.walksPer9Inn || defaults.bb_per_9),
+        gamesStarted: parseInt(s.gamesStarted || '0', 10),
+        gamesPlayed: parseInt(s.gamesPlayed || '0', 10),
       }
     }
   } catch { /* fall through */ }
@@ -199,6 +213,7 @@ async function getTeamRoster(teamId, season = 2024) {
  */
 export async function getTeamLineup(teamId, season = 2024) {
   const defaults = { avg: 0.245, slg: 0.395, k_rate: 0.230, hr_rate: 0.030 }
+  const sportId = sportIdForTeam(teamId)
   try {
     const roster = await getTeamRoster(teamId, season)
     const positionPlayers = []
@@ -216,7 +231,7 @@ export async function getTeamLineup(teamId, season = 2024) {
     // Fetch hitting stats for each position player
     await Promise.all(positionPlayers.map(async (player) => {
       player.stats = player.id
-        ? await getPlayerHittingStats(player.id, season)
+        ? await getPlayerHittingStats(player.id, season, sportId)
         : { ...defaults }
     }))
 
@@ -275,6 +290,7 @@ export async function getTeamLineup(teamId, season = 2024) {
 /** Fetch all pitchers from a team's roster with their pitching stats. */
 export async function getTeamPitchers(teamId, season = 2024) {
   const defaultStats = { era: 4.30, k_per_9: 8.20, bb_per_9: 3.20 }
+  const sportId = sportIdForTeam(teamId)
   try {
     const roster = await getTeamRoster(teamId, season)
     const pitchers = []
@@ -293,9 +309,16 @@ export async function getTeamPitchers(teamId, season = 2024) {
     // Fetch pitching stats in parallel
     await Promise.all(pitchers.map(async (p) => {
       p.stats = p.id
-        ? await getPlayerPitchingStats(p.id, season)
+        ? await getPlayerPitchingStats(p.id, season, sportId)
         : { ...defaultStats }
     }))
+
+    // Classify each pitcher as SP or RP based on games started ratio
+    for (const p of pitchers) {
+      const gs = p.stats.gamesStarted || 0
+      const g = p.stats.gamesPlayed || 0
+      p.role = (g > 0 && gs / g >= 0.5) ? 'SP' : 'RP'
+    }
 
     pitchers.sort((a, b) => (a.stats.era ?? 99) - (b.stats.era ?? 99))
     return pitchers

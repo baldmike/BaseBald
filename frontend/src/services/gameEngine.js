@@ -455,8 +455,14 @@ export async function createNewGame({
           state.away_pitcher = awayPitchers[0] || await mlbApi.getTeamPitcher(opponent.id, oppSeason)
         }
 
-        state.home_bullpen = homePitchers.filter((p) => p.id !== state.home_pitcher.id)
-        state.away_bullpen = awayPitchers.filter((p) => p.id !== state.away_pitcher.id)
+        const homeRelievers = homePitchers.filter((p) => p.id !== state.home_pitcher.id && p.role !== 'SP')
+        state.home_bullpen = homeRelievers.length > 0
+          ? homeRelievers
+          : homePitchers.filter((p) => p.id !== state.home_pitcher.id)
+        const awayRelievers = awayPitchers.filter((p) => p.id !== state.away_pitcher.id && p.role !== 'SP')
+        state.away_bullpen = awayRelievers.length > 0
+          ? awayRelievers
+          : awayPitchers.filter((p) => p.id !== state.away_pitcher.id)
 
         _getCurrentBatter(state)
 

@@ -121,11 +121,11 @@
 
       <div v-if="loadingPitchers" class="pitcher-loading">Loading pitchers...</div>
 
-      <div v-else-if="pitcherList.length > 0" class="pitcher-selection">
+      <div v-else-if="starterList.length > 0" class="pitcher-selection">
         <p>Choose your starting pitcher:</p>
         <div class="pitcher-list">
           <button
-            v-for="p in pitcherList"
+            v-for="p in starterList"
             :key="p.id"
             class="pitcher-option"
             :class="{ selected: selectedPitcherId === p.id }"
@@ -206,11 +206,11 @@
           Home pitcher selection — ONLY shown in classic mode because in normal mode
           the home pitcher was already picked in step 3.
         -->
-        <div v-if="classicMode && pitcherList.length > 0" class="pitcher-selection">
+        <div v-if="classicMode && starterList.length > 0" class="pitcher-selection">
           <p>Choose your starting pitcher ({{ homeTeamName }}):</p>
           <div class="pitcher-list">
             <button
-              v-for="p in pitcherList"
+              v-for="p in starterList"
               :key="p.id"
               class="pitcher-option"
               :class="{ selected: selectedPitcherId === p.id }"
@@ -223,11 +223,11 @@
         </div>
 
         <!-- Away pitcher selection — shown in both normal and classic modes -->
-        <div v-if="awayPitcherList.length > 0" class="pitcher-selection">
+        <div v-if="awayStarterList.length > 0" class="pitcher-selection">
           <p>Choose the opponent's starting pitcher ({{ awayTeamName }}):</p>
           <div class="pitcher-list">
             <button
-              v-for="p in awayPitcherList"
+              v-for="p in awayStarterList"
               :key="p.id"
               class="pitcher-option"
               :class="{ selected: selectedAwayPitcherId === p.id }"
@@ -240,7 +240,7 @@
         </div>
 
         <!-- Fallback when no pitchers are available for either team -->
-        <div v-if="!awayPitcherList.length && (!classicMode || !pitcherList.length)">
+        <div v-if="!awayStarterList.length && (!classicMode || !starterList.length)">
           <p>No pitchers found — they will be assigned automatically.</p>
         </div>
 
@@ -843,6 +843,18 @@ const loadingAwayPitchers = ref(false)
  */
 const awayPitcherList = ref([])
 
+/** Starters only (SP) from the home pitcher list, with fallback to full list. */
+const starterList = computed(() => {
+  const sp = pitcherList.value.filter(p => p.role === 'SP')
+  return sp.length > 0 ? sp : pitcherList.value
+})
+
+/** Starters only (SP) from the away pitcher list, with fallback to full list. */
+const awayStarterList = computed(() => {
+  const sp = awayPitcherList.value.filter(p => p.role === 'SP')
+  return sp.length > 0 ? sp : awayPitcherList.value
+})
+
 /**
  * The MLB player ID of the selected away starting pitcher.
  */
@@ -1019,7 +1031,7 @@ const historicalMatchups = [
   { label: "Dock Ellis: Just Say No-No", subtitle: '1970 Regular Season', date: 'Jun 12, 1970', stadium: 'San Diego Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Dave Roberts', home: { id: 135, name: 'Padres', season: 1970, pitcherId: 121276, pitcherName: 'Dave Roberts' }, away: { id: 134, name: 'Pirates', season: 1970, pitcherId: 113815, pitcherName: 'Dock Ellis' } },
   { label: 'History on September 1st, 1971', subtitle: '1971 Regular Season, First All-Black Lineup', date: 'Sep 1, 1971', stadium: 'Three Rivers Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Woodie Fryman', home: { id: 134, name: 'Pirates', season: 1971, pitcherId: 113815, pitcherName: 'Dock Ellis' }, away: { id: 143, name: 'Phillies', season: 1971, pitcherId: 114466, pitcherName: 'Woodie Fryman' } },
   { label: "Hank Aaron's 715th Home Run", subtitle: '1974 Regular Season', date: 'Apr 8, 1974', stadium: 'Atlanta-Fulton County Stadium', weather: 'clear', winningPitcher: 'Ron Reed', losingPitcher: 'Al Downing', home: { id: 144, name: 'Braves', season: 1974, pitcherId: 121001, pitcherName: 'Ron Reed' }, away: { id: 119, name: 'Dodgers', season: 1974, pitcherId: 113515, pitcherName: 'Al Downing' } },
-  { label: "Mr. October", subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
+  { label: "3 HR from Mr. October", subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
   { label: 'Disco Demolition Night', subtitle: '1979 Doubleheader — Game 2 Forfeited', date: 'Jul 12, 1979', stadium: 'Comiskey Park', weather: 'hot', winningPitcher: 'Pat Underwood', losingPitcher: 'Ken Kravec', home: { id: 145, name: 'White Sox', season: 1979, pitcherId: 117300, pitcherName: 'Ken Kravec' }, away: { id: 116, name: 'Tigers', season: 1979, pitcherId: 123565, pitcherName: 'Pat Underwood' } },
   { label: "Buckner's Demise", subtitle: '1986 World Series, Game 6', date: 'Oct 25, 1986', stadium: 'Shea Stadium', weather: 'cold', winningPitcher: 'Rick Aguilera', losingPitcher: 'Calvin Schiraldi', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 119964, pitcherName: 'Bob Ojeda' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
   { label: "Nolan Ryan's 7th No-Hitter", subtitle: '1991 Regular Season — 44 Years Old', date: 'May 1, 1991', stadium: 'Arlington Stadium', weather: 'clear', winningPitcher: 'Nolan Ryan', losingPitcher: 'Jimmy Key', home: { id: 140, name: 'Rangers', season: 1991, pitcherId: 121597, pitcherName: 'Nolan Ryan' }, away: { id: 141, name: 'Blue Jays', season: 1991, pitcherId: 117032, pitcherName: 'Jimmy Key' } },
