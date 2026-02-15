@@ -20,75 +20,92 @@
       Shown when: no game exists AND we're on step 1
     -->
     <div v-if="!game && setupStep === 1">
-      <div class="season-hero">
-        <h2 class="season-hero-title">Pick a Season</h2>
-        <p class="season-hero-sub">Choose an era, then select your team</p>
-        <select id="home-season" v-model="selectedSeason" class="season-hero-dropdown">
-          <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
-        </select>
-        <span v-if="loadingHomeTeams" class="season-hero-loading">Loading teams...</span>
-      </div>
-      <TeamSelector :teams="homeTeams" @teamSelected="onTeamSelected" />
-
-      <!--
-        Classic Matchups — pre-configured historical matchups that skip
-        the manual team/season selection process.
-
-        WHY CLASSIC MODE EXISTS:
-        Selecting two teams, two seasons, and two pitchers is 5 steps.
-        Classic matchups let users jump straight to a fun, themed game
-        with a single click. They also showcase the historical roster
-        feature by pairing iconic teams from different eras.
-
-        When a classic matchup is selected, classicMode is set to true,
-        which changes step 6's behavior to show BOTH pitcher lists
-        (since the user didn't go through steps 3 and 5 separately).
-      -->
-      <div class="classic-matchups">
-        <h3 class="classic-header">Historic Games</h3>
-        <div class="matchup-grid">
-          <button
-            v-for="(m, i) in historicalMatchups"
-            :key="'h' + i"
-            class="matchup-card"
-            @click="selectClassicMatchup(m)"
-          >
-            <div class="matchup-logos">
-              <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
-              <span class="matchup-vs">vs</span>
-              <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
-            </div>
-            <div class="matchup-label">{{ m.label }}</div>
-            <div class="matchup-date">{{ m.date }} — {{ m.stadium }}</div>
-            <div class="matchup-teams">{{ m.away.name }} @ {{ m.home.name }}</div>
-            <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
-            <div class="matchup-decision"><span class="decision-w">W: {{ m.winningPitcher }}</span> · <span class="decision-l">L: {{ m.losingPitcher }}</span></div>
+      <!-- Mode picker: three paths forward -->
+      <div v-if="!gameMode" class="mode-picker">
+        <h2 class="mode-picker-title">How do you want to play?</h2>
+        <div class="mode-picker-grid">
+          <button class="mode-card" @click="gameMode = 'season'">
+            <span class="mode-icon">&#9918;</span>
+            <span class="mode-label">Pick a Season</span>
+            <span class="mode-desc">Choose an era and build your matchup</span>
           </button>
-        </div>
-
-        <h3 class="classic-header" style="margin-top: 20px">Fantasy Matchups</h3>
-        <div class="matchup-grid">
-          <button
-            v-for="(m, i) in fantasyMatchups"
-            :key="'f' + i"
-            class="matchup-card"
-            @click="selectClassicMatchup(m)"
-          >
-            <div class="matchup-logos">
-              <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
-              <span class="matchup-vs">vs</span>
-              <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
-            </div>
-            <div class="matchup-label">{{ m.label }}</div>
-            <div class="matchup-teams">{{ m.away.season }} {{ m.away.name }} vs {{ m.home.season }} {{ m.home.name }}</div>
-            <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
+          <button class="mode-card" @click="gameMode = 'historic'">
+            <span class="mode-icon">&#127942;</span>
+            <span class="mode-label">Historic Games</span>
+            <span class="mode-desc">Replay legendary real-world matchups</span>
+          </button>
+          <button class="mode-card" @click="gameMode = 'fantasy'">
+            <span class="mode-icon">&#9889;</span>
+            <span class="mode-label">Fantasy Matchups</span>
+            <span class="mode-desc">Dream matchups across eras</span>
           </button>
         </div>
       </div>
 
-      <!-- Skip button: bypasses all team selection and starts with random teams -->
-      <div class="skip-select">
-        <button class="skip-btn" @click="startGame()">Skip — Play without teams</button>
+      <!-- SEASON MODE: pick season + team -->
+      <div v-if="gameMode === 'season'">
+        <button class="back-to-modes" @click="gameMode = null">&larr; Back</button>
+        <div class="season-hero">
+          <h2 class="season-hero-title">Pick a Season</h2>
+          <p class="season-hero-sub">Choose an era, then select your team</p>
+          <select id="home-season" v-model="selectedSeason" class="season-hero-dropdown">
+            <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
+          </select>
+          <span v-if="loadingHomeTeams" class="season-hero-loading">Loading teams...</span>
+        </div>
+        <TeamSelector :teams="homeTeams" @teamSelected="onTeamSelected" />
+      </div>
+
+      <!-- HISTORIC MODE: classic historical matchups -->
+      <div v-if="gameMode === 'historic'">
+        <button class="back-to-modes" @click="gameMode = null">&larr; Back</button>
+        <div class="classic-matchups">
+          <h3 class="classic-header">Historic Games</h3>
+          <div class="matchup-grid">
+            <button
+              v-for="(m, i) in historicalMatchups"
+              :key="'h' + i"
+              class="matchup-card"
+              @click="selectClassicMatchup(m)"
+            >
+              <div class="matchup-logos">
+                <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
+                <span class="matchup-vs">vs</span>
+                <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
+              </div>
+              <div class="matchup-label">{{ m.label }}</div>
+              <div class="matchup-date">{{ m.date }} — {{ m.stadium }}</div>
+              <div class="matchup-teams">{{ m.away.name }} @ {{ m.home.name }}</div>
+              <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
+              <div class="matchup-decision"><span class="decision-w">W: {{ m.winningPitcher }}</span> · <span class="decision-l">L: {{ m.losingPitcher }}</span></div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FANTASY MODE: fantasy matchups -->
+      <div v-if="gameMode === 'fantasy'">
+        <button class="back-to-modes" @click="gameMode = null">&larr; Back</button>
+        <div class="classic-matchups">
+          <h3 class="classic-header">Fantasy Matchups</h3>
+          <div class="matchup-grid">
+            <button
+              v-for="(m, i) in fantasyMatchups"
+              :key="'f' + i"
+              class="matchup-card"
+              @click="selectClassicMatchup(m)"
+            >
+              <div class="matchup-logos">
+                <img :src="teamLogoUrl(m.away.id)" class="matchup-logo" />
+                <span class="matchup-vs">vs</span>
+                <img :src="teamLogoUrl(m.home.id)" class="matchup-logo" />
+              </div>
+              <div class="matchup-label">{{ m.label }}</div>
+              <div class="matchup-teams">{{ m.away.season }} {{ m.away.name }} vs {{ m.home.season }} {{ m.home.name }}</div>
+              <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -296,7 +313,7 @@
         Shows the final score and a win/lose message.
         The overlay uses position: absolute + z-index to sit on top of all game content.
       -->
-      <div v-if="game.game_status === 'final'" class="game-over-overlay">
+      <div v-if="game.game_status === 'final' && !gameOverDismissed" class="game-over-overlay">
         <div class="game-over-card">
           <h2>Game Over!</h2>
           <div class="final-score">
@@ -306,15 +323,16 @@
             </div>
             <div class="vs">—</div>
             <div class="final-team">
-              <!-- "(You)" label reminds the player which team they controlled -->
               <span class="label">{{ game.home_abbreviation || 'HOME' }} (You)</span>
               <span class="score">{{ game.home_total }}</span>
             </div>
           </div>
-          <!-- Simple win/lose determination based on run totals -->
           <p class="result-text">{{ game.home_total > game.away_total ? 'You Win!' : 'You Lose!' }}</p>
-          <!-- Resets all state and returns to step 1 -->
-          <button class="play-btn" @click="resetGame">New Game</button>
+          <div class="game-over-actions">
+            <button class="play-btn" @click="showPostGame('boxscore')">Box Score</button>
+            <button class="play-btn" @click="showPostGame('scorecard')">Scorecard</button>
+          </div>
+          <button class="play-btn new-game-btn" @click="resetGame">New Game</button>
         </div>
       </div>
 
@@ -671,6 +689,10 @@
           </table>
         </div>
       </div>
+
+      <div v-if="game.game_status === 'final' && gameOverDismissed" class="post-game-footer">
+        <button class="play-btn" @click="resetGame">New Game</button>
+      </div>
     </div>
   </div>
 </template>
@@ -704,6 +726,8 @@ const game = ref(null)
 const loading = ref(false)
 
 const showScorecard = ref(false)
+const gameOverDismissed = ref(false)
+const gameMode = ref(null)
 
 // ============================================================
 // SETUP WIZARD STATE
@@ -809,6 +833,7 @@ const selectedAwayPitcherId = ref(null)
  */
 const classicMode = ref(false)
 const classicLabel = ref('')
+const classicMatchupData = ref(null)
 
 /**
  * Selected weather condition key (e.g., 'clear', 'hot', 'rain').
@@ -1106,6 +1131,7 @@ function formatIP(ipOuts) {
 async function selectClassicMatchup(matchup) {
   classicMode.value = true
   classicLabel.value = matchup.label || ''
+  classicMatchupData.value = matchup
   selectedWeather.value = matchup.weather || 'clear'
   teamSelected.value = matchup.home.id
   selectedSeason.value = matchup.home.season
@@ -1233,6 +1259,7 @@ function goBack() {
     // Classic mode skipped steps 2-4, so "back" from weather returns to step 1
     classicMode.value = false
   classicLabel.value = ''
+  classicMatchupData.value = null
     teamSelected.value = null
     setupStep.value = 1
   } else if (setupStep.value === 2) {
@@ -1288,6 +1315,36 @@ async function startGame() {
  * This creates an animated replay of the full game, as if watching
  * the plays happen one by one, but without any network requests during playback.
  */
+/**
+ * Build classic reliever info from the matchup data.
+ * If the winning/losing pitcher differs from the starter, that pitcher
+ * is a reliever who should enter the game during simulation.
+ */
+function _buildClassicRelievers() {
+  const m = classicMatchupData.value
+  if (!m || !m.winningPitcher) return null
+  const relievers = {}
+  // If home starter isn't the winning or losing pitcher, the W or L pitcher was a home reliever
+  if (m.home.pitcherName !== m.winningPitcher && m.home.pitcherName !== m.losingPitcher) {
+    // Home starter got no decision — both W and L belong to away and another home pitcher
+  }
+  // Check if the winning pitcher is a home reliever (not the home starter)
+  if (m.winningPitcher && m.winningPitcher !== m.home.pitcherName && m.winningPitcher !== m.away.pitcherName) {
+    relievers.home = m.winningPitcher
+  }
+  if (m.losingPitcher && m.losingPitcher !== m.home.pitcherName && m.losingPitcher !== m.away.pitcherName) {
+    relievers.home = relievers.home || m.losingPitcher
+  }
+  // Check if the winning pitcher is an away reliever (not the away starter)
+  if (m.winningPitcher && m.winningPitcher !== m.away.pitcherName && m.winningPitcher !== m.home.pitcherName) {
+    relievers.away = m.winningPitcher
+  }
+  if (m.losingPitcher && m.losingPitcher !== m.away.pitcherName && m.losingPitcher !== m.home.pitcherName) {
+    relievers.away = relievers.away || m.losingPitcher
+  }
+  return (relievers.home || relievers.away) ? relievers : null
+}
+
 async function startSimulation() {
   loading.value = true
   try {
@@ -1300,6 +1357,7 @@ async function startSimulation() {
       awaySeason: selectedAwaySeason.value,
       awayPitcherId: selectedAwayPitcherId.value,
       weather: selectedWeather.value,
+      classicRelievers: _buildClassicRelievers(),
     })
     // Step 2: Run the full simulation locally
     const result = simulateGame(newGame)
@@ -1403,13 +1461,21 @@ onUnmounted(() => {
  * completely fresh experience without any leftover state from the
  * previous game.
  */
+function showPostGame(view) {
+  gameOverDismissed.value = true
+  showScorecard.value = view === 'scorecard'
+}
+
 async function resetGame() {
+  gameOverDismissed.value = false
+  gameMode.value = null
   stopReplayTimer()
   simulating.value = false
   simSnapshots.value = []
   simReplayIndex.value = 0
   classicMode.value = false
   classicLabel.value = ''
+  classicMatchupData.value = null
   game.value = null
   setupStep.value = 1
   teamSelected.value = null
@@ -1574,6 +1640,76 @@ onMounted(async () => {
 }
 
 /* ========== Season Hero (Step 1) ========== */
+/* ========== Mode Picker ========== */
+.mode-picker {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.mode-picker-title {
+  font-size: 24px;
+  color: #ffdd00;
+  margin-bottom: 24px;
+}
+
+.mode-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 700px;
+  margin: 0 auto 24px auto;
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  background: #0f0f23;
+  border: 1px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #ccc;
+}
+
+.mode-card:hover {
+  border-color: #ffdd00;
+  background: #1a1a3a;
+}
+
+.mode-icon {
+  font-size: 32px;
+}
+
+.mode-label {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.mode-desc {
+  font-size: 12px;
+  color: #888;
+}
+
+.back-to-modes {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.back-to-modes:hover {
+  color: #ffdd00;
+}
+
+/* ========== Season Hero ========== */
 .season-hero {
   text-align: center;
   padding: 28px 20px 20px;
@@ -1621,31 +1757,6 @@ onMounted(async () => {
   color: #888;
   font-size: 13px;
   margin-top: 8px;
-}
-
-/* ========== Skip Button ========== */
-/* Container for the "Skip — Play without teams" button */
-.skip-select {
-  text-align: center;
-  margin-top: 16px;
-}
-
-/* Skip button: subtle/ghost style since it's a secondary action */
-.skip-btn {
-  background: none;
-  border: 1px solid #555;
-  color: #888;
-  padding: 8px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-
-/* Skip button hover: becomes more visible to confirm interactivity */
-.skip-btn:hover {
-  border-color: #e94560;
-  color: #e0e0e0;
 }
 
 /* ========== Start Screen (Steps 2-6) ========== */
@@ -1870,18 +1981,19 @@ onMounted(async () => {
 .play-btn {
   background: #e94560;
   color: white;
-  border: none;
+  border: 2px solid #e94560;
   padding: 14px 40px;
   font-size: 20px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 /* Lighter red on hover for the primary button */
 .play-btn:hover:not(:disabled) {
   background: #ff6b81;
+  border-color: #ff6b81;
 }
 
 /* Disabled state: reduced opacity and not-allowed cursor */
@@ -2049,6 +2161,29 @@ onMounted(async () => {
   font-weight: bold;
   color: #4caf50;
   margin-bottom: 24px;
+}
+
+.game-over-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.new-game-btn {
+  opacity: 0.7;
+  font-size: 13px !important;
+  padding: 8px 20px !important;
+}
+
+.new-game-btn:hover {
+  opacity: 1;
+}
+
+.post-game-footer {
+  text-align: center;
+  margin-top: 24px;
+  padding-bottom: 16px;
 }
 
 /* ========== Last Play Banner ========== */
@@ -2301,13 +2436,14 @@ onMounted(async () => {
   Red border keeps it connected to the app's color scheme.
 */
 .simulate-btn {
-  background: #0f3460;
+  background: transparent;
+  color: #e94560;
   border: 2px solid #e94560;
 }
 
-/* Simulate button hover: slightly lighter blue */
 .simulate-btn:hover:not(:disabled) {
-  background: #1a4a7a;
+  background: #e94560;
+  color: white;
 }
 
 /* Margin around the simulation speed controls during replay */
@@ -2737,6 +2873,10 @@ onMounted(async () => {
 
   /* Matchup grid: single column on small screens */
   .matchup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-picker-grid {
     grid-template-columns: 1fr;
   }
 

@@ -51,6 +51,7 @@ function _emptyState() {
     away_bullpen: [],
     home_scorecard: [],
     away_scorecard: [],
+    classic_relievers: null,
   }
 }
 
@@ -325,6 +326,7 @@ function _snapshot(state) {
     away_bullpen: state.away_bullpen.map((p) => ({ ...p })),
     home_scorecard: state.home_scorecard.map((r) => ({ ...r })),
     away_scorecard: state.away_scorecard.map((r) => ({ ...r })),
+    classic_relievers: state.classic_relievers,
   }
 }
 
@@ -367,10 +369,12 @@ export async function createNewGame({
   awaySeason = null,
   awayPitcherId = null,
   weather = null,
+  classicRelievers = null,
 } = {}) {
   const state = _emptyState()
   state.game_id = crypto.randomUUID()
   state.weather = weather || 'clear'
+  state.classic_relievers = classicRelievers
 
   if (homeTeamId) {
     try {
@@ -508,6 +512,54 @@ export function processAtBat(state, action) {
   return state
 }
 
+/**
+ * Find a reliever from the bullpen by name (case-insensitive partial match).
+ * Returns the index in the bullpen array, or -1 if not found.
+ */
+function _findRelieverIdx(bullpen, name) {
+  if (!name || !bullpen.length) return -1
+  const lower = name.toLowerCase()
+  return bullpen.findIndex((p) => p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase()))
+}
+
+/**
+ * Check if a pitching change should happen for the given side, and make it.
+ * For classic games with designated relievers, bring in the named reliever
+ * around inning 7. Otherwise fall back to the standard fatigue rule (100 pitches).
+ */
+function _maybeSwapPitcher(state, side) {
+  const bullpen = state[side + '_bullpen']
+  if (!bullpen.length) return
+
+  const pitchCount = state[side + '_pitch_count']
+  const relievers = state.classic_relievers
+  const relieverName = relievers?.[side]
+
+  if (relieverName) {
+    // Classic mode: bring in the named reliever at inning 7+ (start of a half-inning, 0 outs)
+    if (state.inning >= 7 && state.outs === 0) {
+      const currentPitcher = state[side + '_pitcher']
+      // Only switch if we haven't already switched to this reliever
+      if (currentPitcher && !currentPitcher.name.toLowerCase().includes(relieverName.toLowerCase())) {
+        const idx = _findRelieverIdx(bullpen, relieverName)
+        if (idx >= 0) {
+          switchPitcher(state, side, bullpen.splice(idx, 1)[0])
+          return
+        }
+      }
+    }
+    // Also apply standard fatigue rule as fallback
+    if (pitchCount >= 100) {
+      switchPitcher(state, side, bullpen.shift())
+    }
+  } else {
+    // Standard fatigue-based replacement
+    if (pitchCount >= 100) {
+      switchPitcher(state, side, bullpen.shift())
+    }
+  }
+}
+
 /** Simulate an entire game (CPU vs CPU) and return snapshots at each play. */
 export function simulateGame(state) {
   if (!state || state.game_status !== 'active') return { state: state || {}, snapshots: [] }
@@ -520,10 +572,7 @@ export function simulateGame(state) {
     iteration++
 
     if (state.player_role === 'pitching') {
-      // CPU auto-replaces home pitcher when fatigued
-      if (state.home_pitch_count >= 100 && state.home_bullpen.length > 0) {
-        switchPitcher(state, 'home', state.home_bullpen.shift())
-      }
+      _maybeSwapPitcher(state, 'home')
       const batter = _getCurrentBatter(state)
       const playerStats = batter?.stats || null
       const batterName = batter?.name || 'Batter'
@@ -537,10 +586,7 @@ export function simulateGame(state) {
       const msg = `You throw a ${pitchType}. ${batterName} ${actionStr}: ${_formatOutcome(outcome)}!`
       _applyOutcome(state, outcome, msg)
     } else {
-      // CPU auto-replaces away pitcher when fatigued
-      if (state.away_pitch_count >= 100 && state.away_bullpen.length > 0) {
-        switchPitcher(state, 'away', state.away_bullpen.shift())
-      }
+      _maybeSwapPitcher(state, 'away')
       const batter = _getCurrentBatter(state)
       const playerStats = batter?.stats || null
       const pitcher = state.away_pitcher

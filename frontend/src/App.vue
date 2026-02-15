@@ -116,29 +116,37 @@ body {
 
 .nav-tabs {
   display: flex;
-  gap: 4px;
+  gap: 0;
 }
 
 .nav-tab {
-  background: none;
-  border: 1px solid #555;
-  color: #aaa;
-  padding: 6px 16px;
-  border-radius: 6px;
+  background: transparent;
+  border: 2px solid #e94560;
+  color: #e94560;
+  padding: 8px 24px;
+  min-width: 120px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   transition: all 0.2s;
 }
 
-.nav-tab:hover {
-  border-color: #e94560;
-  color: #e0e0e0;
+.nav-tab:first-child {
+  border-radius: 6px 0 0 6px;
+  border-right: 1px solid #e94560;
+}
+
+.nav-tab:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: 1px solid #e94560;
+}
+
+.nav-tab:hover:not(.active) {
+  background: rgba(233, 69, 96, 0.15);
 }
 
 .nav-tab.active {
   background: #e94560;
-  border-color: #e94560;
   color: white;
 }
 
