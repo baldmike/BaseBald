@@ -316,7 +316,11 @@ export async function getTeamPitcher(teamId, season = 2024) {
   return pitchers.length ? pitchers[0] : defaultPitcher
 }
 
-/** Fetch a team's home venue for a given season. */
+/**
+ * Fetch a team's home venue for a given season.
+ * Uses the `hydrate=venue` parameter to include venue data in the team response.
+ * Returns { id, name } for the venue, or null if unavailable or on error.
+ */
 export async function getTeamVenue(teamId, season) {
   try {
     const data = await mlbFetch(`/api/v1/teams/${teamId}?hydrate=venue&season=${season}`)

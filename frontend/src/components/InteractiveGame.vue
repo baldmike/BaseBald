@@ -870,12 +870,16 @@ const classicMatchupData = ref(null)
 const selectedWeather = ref('clear')
 
 /**
- * Selected venue name displayed during gameplay.
+ * Selected venue name displayed below the matchup title during gameplay.
+ * Defaults to the home team's stadium; user can switch to the away team's
+ * stadium in the venue picker (step 5).
  */
 const selectedVenue = ref('')
 
 /**
- * Home and away team venue objects ({ id, name }) fetched from API.
+ * Home and away team venue objects ({ id, name }) fetched from the MLB Stats API
+ * via getTeamVenue(). For historic matchups with a hardcoded `stadium` field,
+ * that value is used directly instead of fetching.
  */
 const homeVenue = ref(null)
 const awayVenue = ref(null)
@@ -1012,18 +1016,28 @@ function onToggleSound() {
 const historicalMatchups = [
   { label: "Babe Ruth's Called Shot", subtitle: '1932 World Series, Game 3', date: 'Oct 1, 1932', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'George Pipgras', losingPitcher: 'Charlie Root', home: { id: 112, name: 'Cubs', season: 1932, pitcherId: 121440, pitcherName: 'Charlie Root' }, away: { id: 147, name: 'Yankees', season: 1932, pitcherId: 120593, pitcherName: 'George Pipgras' } },
   { label: "Don Larsen's Perfect Game", subtitle: '1956 World Series, Game 5', date: 'Oct 8, 1956', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Don Larsen', losingPitcher: 'Sal Maglie', home: { id: 147, name: 'Yankees', season: 1956, pitcherId: 117514, pitcherName: 'Don Larsen' }, away: { id: 119, name: 'Dodgers', season: 1956, pitcherId: 118140, pitcherName: 'Sal Maglie' } },
-  { label: "Hank Aaron's 715th Home Run", subtitle: '1974 Regular Season', date: 'Apr 8, 1974', stadium: 'Atlanta-Fulton County Stadium', weather: 'clear', winningPitcher: 'Ron Reed', losingPitcher: 'Al Downing', home: { id: 144, name: 'Braves', season: 1974, pitcherId: 121001, pitcherName: 'Ron Reed' }, away: { id: 119, name: 'Dodgers', season: 1974, pitcherId: 113515, pitcherName: 'Al Downing' } },
-  { label: "Mr. October", subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
-  { label: "Buckner's Demise", subtitle: '1986 World Series, Game 6', date: 'Oct 25, 1986', stadium: 'Shea Stadium', weather: 'cold', winningPitcher: 'Rick Aguilera', losingPitcher: 'Calvin Schiraldi', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 119964, pitcherName: 'Bob Ojeda' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
-  { label: "McGwire's 62nd Home Run", subtitle: '1998 Regular Season', date: 'Sep 8, 1998', stadium: 'Busch Stadium', weather: 'hot', winningPitcher: 'Kent Mercker', losingPitcher: 'Steve Trachsel', home: { id: 138, name: 'Cardinals', season: 1998, pitcherId: 118967, pitcherName: 'Kent Mercker' }, away: { id: 112, name: 'Cubs', season: 1998, pitcherId: 123431, pitcherName: 'Steve Trachsel' } },
-  { label: 'Sammy Sosa Corked Bat Game', subtitle: '2003 Regular Season', date: 'Jun 3, 2003', stadium: 'Wrigley Field', weather: 'wind_out', winningPitcher: 'Mike Remlinger', losingPitcher: 'Al Levine', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 139, name: 'Devil Rays', season: 2003, pitcherId: 114928, pitcherName: 'Geremi Gonzalez' } },
-  { label: 'Game 4 World Series Sweep', subtitle: '2005 World Series, Game 4', date: 'Oct 26, 2005', stadium: 'Minute Maid Park', weather: 'dome', winningPitcher: 'Freddy Garcia', losingPitcher: 'Brad Lidge', home: { id: 117, name: 'Astros', season: 2005, pitcherId: 407840, pitcherName: 'Brandon Backe' }, away: { id: 145, name: 'White Sox', season: 2005, pitcherId: 150119, pitcherName: 'Freddy Garcia' } },
-  { label: "Buehrle's Perfect Game", subtitle: '2009 Regular Season', date: 'Jul 23, 2009', stadium: 'U.S. Cellular Field', weather: 'hot', winningPitcher: 'Mark Buehrle', losingPitcher: 'Scott Kazmir', home: { id: 145, name: 'White Sox', season: 2009, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 139, name: 'Rays', season: 2009, pitcherId: 431148, pitcherName: 'Scott Kazmir' } },
   { label: "Dock Ellis: Just Say No-No", subtitle: '1970 Regular Season', date: 'Jun 12, 1970', stadium: 'San Diego Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Dave Roberts', home: { id: 135, name: 'Padres', season: 1970, pitcherId: 121276, pitcherName: 'Dave Roberts' }, away: { id: 134, name: 'Pirates', season: 1970, pitcherId: 113815, pitcherName: 'Dock Ellis' } },
   { label: 'History on September 1st, 1971', subtitle: '1971 Regular Season, First All-Black Lineup', date: 'Sep 1, 1971', stadium: 'Three Rivers Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Woodie Fryman', home: { id: 134, name: 'Pirates', season: 1971, pitcherId: 113815, pitcherName: 'Dock Ellis' }, away: { id: 143, name: 'Phillies', season: 1971, pitcherId: 114466, pitcherName: 'Woodie Fryman' } },
+  { label: "Hank Aaron's 715th Home Run", subtitle: '1974 Regular Season', date: 'Apr 8, 1974', stadium: 'Atlanta-Fulton County Stadium', weather: 'clear', winningPitcher: 'Ron Reed', losingPitcher: 'Al Downing', home: { id: 144, name: 'Braves', season: 1974, pitcherId: 121001, pitcherName: 'Ron Reed' }, away: { id: 119, name: 'Dodgers', season: 1974, pitcherId: 113515, pitcherName: 'Al Downing' } },
+  { label: "Mr. October", subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
+  { label: 'Disco Demolition Night', subtitle: '1979 Doubleheader — Game 2 Forfeited', date: 'Jul 12, 1979', stadium: 'Comiskey Park', weather: 'hot', winningPitcher: 'Pat Underwood', losingPitcher: 'Ken Kravec', home: { id: 145, name: 'White Sox', season: 1979, pitcherId: 117300, pitcherName: 'Ken Kravec' }, away: { id: 116, name: 'Tigers', season: 1979, pitcherId: 123565, pitcherName: 'Pat Underwood' } },
+  { label: "Buckner's Demise", subtitle: '1986 World Series, Game 6', date: 'Oct 25, 1986', stadium: 'Shea Stadium', weather: 'cold', winningPitcher: 'Rick Aguilera', losingPitcher: 'Calvin Schiraldi', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 119964, pitcherName: 'Bob Ojeda' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
+  { label: "Nolan Ryan's 7th No-Hitter", subtitle: '1991 Regular Season — 44 Years Old', date: 'May 1, 1991', stadium: 'Arlington Stadium', weather: 'clear', winningPitcher: 'Nolan Ryan', losingPitcher: 'Jimmy Key', home: { id: 140, name: 'Rangers', season: 1991, pitcherId: 121597, pitcherName: 'Nolan Ryan' }, away: { id: 141, name: 'Blue Jays', season: 1991, pitcherId: 117032, pitcherName: 'Jimmy Key' } },
+  { label: "McGwire's 62nd Home Run", subtitle: '1998 Regular Season', date: 'Sep 8, 1998', stadium: 'Busch Stadium', weather: 'hot', winningPitcher: 'Kent Mercker', losingPitcher: 'Steve Trachsel', home: { id: 138, name: 'Cardinals', season: 1998, pitcherId: 118967, pitcherName: 'Kent Mercker' }, away: { id: 112, name: 'Cubs', season: 1998, pitcherId: 123431, pitcherName: 'Steve Trachsel' } },
+  { label: 'Sammy Sosa Corked Bat Game', subtitle: '2003 Regular Season', date: 'Jun 3, 2003', stadium: 'Wrigley Field', weather: 'wind_out', winningPitcher: 'Mike Remlinger', losingPitcher: 'Al Levine', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 139, name: 'Devil Rays', season: 2003, pitcherId: 114928, pitcherName: 'Geremi Gonzalez' } },
+  { label: 'The Bartman Game', subtitle: '2003 NLCS, Game 6', date: 'Oct 14, 2003', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'Josh Beckett', losingPitcher: 'Mark Prior', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 146, name: 'Marlins', season: 2003, pitcherId: 150230, pitcherName: 'Mark Redman' } },
+  { label: 'Game 4 World Series Sweep', subtitle: '2005 World Series, Game 4', date: 'Oct 26, 2005', stadium: 'Minute Maid Park', weather: 'dome', winningPitcher: 'Freddy Garcia', losingPitcher: 'Brad Lidge', home: { id: 117, name: 'Astros', season: 2005, pitcherId: 407840, pitcherName: 'Brandon Backe' }, away: { id: 145, name: 'White Sox', season: 2005, pitcherId: 150119, pitcherName: 'Freddy Garcia' } },
+  { label: "Buehrle's Perfect Game", subtitle: '2009 Regular Season', date: 'Jul 23, 2009', stadium: 'U.S. Cellular Field', weather: 'hot', winningPitcher: 'Mark Buehrle', losingPitcher: 'Scott Kazmir', home: { id: 145, name: 'White Sox', season: 2009, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 139, name: 'Rays', season: 2009, pitcherId: 431148, pitcherName: 'Scott Kazmir' } },
   { label: 'Cubs Break the Curse — Game 7', subtitle: '2016 World Series, Game 7', date: 'Nov 2, 2016', stadium: 'Progressive Field', weather: 'rain', winningPitcher: 'Mike Montgomery', losingPitcher: 'Bryan Shaw', home: { id: 114, name: 'Indians', season: 2016, pitcherId: 446372, pitcherName: 'Corey Kluber' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
 ]
 
+/**
+ * Fantasy matchups — "what-if" dream games that never happened.
+ * Each entry pits two teams from different eras against each other,
+ * using real rosters and pitchers from the MLB Stats API.
+ * Numbered #1–#15 in the UI via template index.
+ * Same shape as historicalMatchups but without date/stadium/weather/winner fields.
+ */
 const fantasyMatchups = [
   { label: 'Crosstown Classic', subtitle: 'Getcher pops from da Jewels, grab a seat in the frunchroom and watch your team win by a couple two tree.', home: { id: 145, name: 'White Sox', season: 2005, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
   { label: 'Coast to Coast', subtitle: 'Mantle vs Ohtani', home: { id: 119, name: 'Dodgers', season: 2024, pitcherId: 808967, pitcherName: 'Yoshinobu Yamamoto' }, away: { id: 147, name: 'Yankees', season: 1956, pitcherId: 114299, pitcherName: 'Whitey Ford' } },
@@ -1728,8 +1742,15 @@ onMounted(async () => {
   homeTeams.value = await getAllTeams(selectedSeason.value)
 })
 
+/** Whether a game is actively in progress (used by App.vue to hide the header). */
 const isPlaying = computed(() => !!game.value)
 
+/**
+ * Expose properties to the parent (App.vue) via template ref:
+ * - showBackButton: controls visibility of the back button in the header nav
+ * - handleBack: navigates back one step in the setup wizard
+ * - isPlaying: hides the entire header during active gameplay
+ */
 defineExpose({ showBackButton, handleBack, isPlaying })
 
 </script>

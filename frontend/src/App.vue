@@ -44,6 +44,9 @@
       <InteractiveGame v-if="activeTab === 'play'" ref="gameRef" />
       <GameView v-else-if="activeTab === 'live'" />
     </main>
+    <footer class="app-footer">
+      <span>&copy; BALDMIKE</span>
+    </footer>
   </div>
 </template>
 
@@ -155,6 +158,14 @@ body {
   padding: 20px;
   box-sizing: border-box;
   flex: 1;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 16px;
+  color: #555;
+  font-size: 12px;
+  letter-spacing: 1px;
 }
 
 @media (max-width: 600px) {
