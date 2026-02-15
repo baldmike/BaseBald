@@ -322,6 +322,11 @@
         Scoreboard component — displays the line score grid with per-inning runs,
         ball-strike count, outs, and current inning. All data is passed as props.
       -->
+      <div class="matchup-title">
+        <span v-if="classicLabel" class="classic-label">{{ classicLabel }}</span>
+        {{ game.away_team || 'Away' }} @ {{ game.home_team || 'Home' }}
+      </div>
+
       <Scoreboard
         :away-score="game.away_score"
         :home-score="game.home_score"
@@ -515,11 +520,37 @@
       </div>
 
       <!--
+        ==================== SCORE VIEW TOGGLE ====================
+        Toggle between traditional box score and per-PA scorecard.
+      -->
+      <div class="score-view-toggle">
+        <button :class="{ active: !showScorecard }" @click="showScorecard = false">Box Score</button>
+        <button :class="{ active: showScorecard }" @click="showScorecard = true">Scorecard</button>
+      </div>
+
+      <!--
+        ==================== SCORECARD VIEW ====================
+        Traditional per-PA scorecard grid, shown when toggled on.
+      -->
+      <div v-if="showScorecard" class="scorecard-section">
+        <Scorecard
+          :scorecard="game.away_scorecard || []"
+          :lineup="game.away_box_score || []"
+          :team-abbr="game.away_abbreviation || 'AWAY'"
+        />
+        <Scorecard
+          :scorecard="game.home_scorecard || []"
+          :lineup="game.home_box_score || []"
+          :team-abbr="game.home_abbreviation || 'HOME'"
+        />
+      </div>
+
+      <!--
         ==================== BOX SCORE ====================
         Running box score showing per-player batting stats and pitcher stats
         for both teams. Updates after every play.
       -->
-      <div class="box-score-section">
+      <div v-show="!showScorecard" class="box-score-section">
         <!-- Away team batting -->
         <div class="box-team">
           <h3 class="box-team-header">{{ game.away_abbreviation || 'AWAY' }} Batting</h3>
@@ -531,6 +562,9 @@
                 <th>AB</th>
                 <th>R</th>
                 <th>H</th>
+                <th>2B</th>
+                <th>3B</th>
+                <th>HR</th>
                 <th>RBI</th>
                 <th>BB</th>
                 <th>SO</th>
@@ -547,6 +581,9 @@
                 <td>{{ p.ab }}</td>
                 <td>{{ p.r }}</td>
                 <td>{{ p.h }}</td>
+                <td>{{ p['2b'] }}</td>
+                <td>{{ p['3b'] }}</td>
+                <td>{{ p.hr }}</td>
                 <td>{{ p.rbi }}</td>
                 <td>{{ p.bb }}</td>
                 <td>{{ p.so }}</td>
@@ -566,6 +603,9 @@
                 <th>AB</th>
                 <th>R</th>
                 <th>H</th>
+                <th>2B</th>
+                <th>3B</th>
+                <th>HR</th>
                 <th>RBI</th>
                 <th>BB</th>
                 <th>SO</th>
@@ -582,6 +622,9 @@
                 <td>{{ p.ab }}</td>
                 <td>{{ p.r }}</td>
                 <td>{{ p.h }}</td>
+                <td>{{ p['2b'] }}</td>
+                <td>{{ p['3b'] }}</td>
+                <td>{{ p.hr }}</td>
                 <td>{{ p.rbi }}</td>
                 <td>{{ p.bb }}</td>
                 <td>{{ p.so }}</td>
@@ -641,6 +684,7 @@ import { useSoundEffects } from '../composables/useSoundEffects.js'
 import BaseballDiamond from './BaseballDiamond.vue'
 import Scoreboard from './Scoreboard.vue'
 import TeamSelector from './TeamSelector.vue'
+import Scorecard from './Scorecard.vue'
 
 // ============================================================
 // CORE GAME STATE
@@ -659,6 +703,7 @@ const game = ref(null)
  */
 const loading = ref(false)
 
+const showScorecard = ref(false)
 
 // ============================================================
 // SETUP WIZARD STATE
@@ -763,6 +808,7 @@ const selectedAwayPitcherId = ref(null)
  * mode, "Back" returns to step 1 (not step 5) since steps 2-5 were skipped.
  */
 const classicMode = ref(false)
+const classicLabel = ref('')
 
 /**
  * Selected weather condition key (e.g., 'clear', 'hot', 'rain').
@@ -1059,6 +1105,7 @@ function formatIP(ipOuts) {
  */
 async function selectClassicMatchup(matchup) {
   classicMode.value = true
+  classicLabel.value = matchup.label || ''
   selectedWeather.value = matchup.weather || 'clear'
   teamSelected.value = matchup.home.id
   selectedSeason.value = matchup.home.season
@@ -1185,6 +1232,7 @@ function goBack() {
   if (classicMode.value && setupStep.value === 5) {
     // Classic mode skipped steps 2-4, so "back" from weather returns to step 1
     classicMode.value = false
+  classicLabel.value = ''
     teamSelected.value = null
     setupStep.value = 1
   } else if (setupStep.value === 2) {
@@ -1361,6 +1409,7 @@ async function resetGame() {
   simSnapshots.value = []
   simReplayIndex.value = 0
   classicMode.value = false
+  classicLabel.value = ''
   game.value = null
   setupStep.value = 1
   teamSelected.value = null
@@ -2101,6 +2150,76 @@ onMounted(async () => {
 .take-btn:hover:not(:disabled) {
   background: #4caf50;
   color: white;
+}
+
+/* ========== Matchup Title ========== */
+.matchup-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffdd00;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.classic-label {
+  display: block;
+  font-size: 13px;
+  color: #ccc;
+  font-weight: normal;
+  letter-spacing: 0;
+  margin-bottom: 2px;
+}
+
+/* ========== Score View Toggle ========== */
+.score-view-toggle {
+  display: flex;
+  gap: 0;
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.score-view-toggle button {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid #333;
+  background: #0a0a1a;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.score-view-toggle button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.score-view-toggle button:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.score-view-toggle button.active {
+  background: #1a1a3a;
+  color: #ffdd00;
+  border-color: #ffdd00;
+}
+
+.score-view-toggle button:hover:not(.active) {
+  background: #111;
+  color: #aaa;
+}
+
+.scorecard-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ========== Box Score ========== */

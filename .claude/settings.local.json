@@ -15,7 +15,10 @@
       "Bash(lsof:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run build:*)",
+      "WebFetch(domain:statsapi.mlb.com)",
+      "Bash(git push:*)"
     ]
   }
 }

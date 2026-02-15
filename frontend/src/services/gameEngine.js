@@ -49,6 +49,8 @@ function _emptyState() {
     away_pitch_count: 0,
     home_bullpen: [],
     away_bullpen: [],
+    home_scorecard: [],
+    away_scorecard: [],
   }
 }
 
@@ -186,6 +188,21 @@ function _endHalfInning(state) {
   }
 }
 
+function _pushScorecardPA(state, result, rbi) {
+  const sc = state.is_top ? state.away_scorecard : state.home_scorecard
+  const idx = state.is_top ? (state.away_batter_idx || 0) : (state.home_batter_idx || 0)
+  const lineup = state.is_top ? state.away_lineup : state.home_lineup
+  sc.push({
+    inning: state.inning,
+    batterName: lineup ? lineup[idx % lineup.length]?.name || '' : '',
+    batterIdx: lineup ? idx % lineup.length : 0,
+    result,
+    rbi: rbi || 0,
+    runs: 0,
+    pitchCount: `${state.balls}-${state.strikes}`,
+  })
+}
+
 function _walk(state) {
   const batterBox = _getBatterBox(state)
   const pitcherBox = _getPitcherBox(state)
@@ -197,13 +214,15 @@ function _walk(state) {
   const runs = _advanceRunnersWalk(state.bases)
   if (batterBox && runs > 0) batterBox.rbi += runs
   if (pitcherBox && runs > 0) { pitcherBox.r += runs; pitcherBox.er += runs }
+  _pushScorecardPA(state, 'walk', runs)
   _scoreRuns(state, runs)
   _resetCount(state)
   _advanceBatter(state)
   _getCurrentBatter(state)
 }
 
-function _recordOut(state, description) {
+function _recordOut(state, description, outType) {
+  if (outType) _pushScorecardPA(state, outType, 0)
   state.play_log.push(description)
   state.last_play = description
   state.outs += 1
@@ -220,8 +239,14 @@ function _recordHit(state, hitType) {
   const batterBox = _getBatterBox(state)
   const pitcherBox = _getPitcherBox(state)
   const runs = _advanceRunnersHit(state.bases, hitType)
-  if (batterBox && runs > 0) batterBox.rbi += runs
+  if (batterBox) {
+    if (runs > 0) batterBox.rbi += runs
+    if (hitType === 'double') batterBox['2b'] += 1
+    else if (hitType === 'triple') batterBox['3b'] += 1
+    else if (hitType === 'homerun') batterBox.hr += 1
+  }
   if (pitcherBox && runs > 0) { pitcherBox.r += runs; pitcherBox.er += runs }
+  _pushScorecardPA(state, hitType, runs)
   _scoreRuns(state, runs)
   _resetCount(state)
   _advanceBatter(state)
@@ -250,14 +275,14 @@ function _applyOutcome(state, outcome, msg) {
     if (state.strikes >= 3) {
       if (batterBox) { batterBox.ab += 1; batterBox.so += 1 }
       if (pitcherBox) { pitcherBox.so += 1; pitcherBox.ip_outs += 1 }
-      _recordOut(state, 'Strikeout!')
+      _recordOut(state, 'Strikeout!', 'strikeout')
     }
   } else if (outcome === 'foul') {
     if (state.strikes < 2) state.strikes += 1
   } else if (OUT_TYPES.has(outcome)) {
     if (batterBox) batterBox.ab += 1
     if (pitcherBox) pitcherBox.ip_outs += 1
-    _recordOut(state, _formatOutcome(outcome) + '!')
+    _recordOut(state, _formatOutcome(outcome) + '!', outcome)
   } else if (HIT_TYPES.has(outcome)) {
     if (batterBox) { batterBox.ab += 1; batterBox.h += 1 }
     if (pitcherBox) pitcherBox.h += 1
@@ -298,6 +323,8 @@ function _snapshot(state) {
     away_pitch_count: state.away_pitch_count,
     home_bullpen: state.home_bullpen.map((p) => ({ ...p })),
     away_bullpen: state.away_bullpen.map((p) => ({ ...p })),
+    home_scorecard: state.home_scorecard.map((r) => ({ ...r })),
+    away_scorecard: state.away_scorecard.map((r) => ({ ...r })),
   }
 }
 
@@ -403,7 +430,7 @@ export async function createNewGame({
         for (const [lineup, key] of [[state.home_lineup, 'home_box_score'], [state.away_lineup, 'away_box_score']]) {
           if (lineup) {
             state[key] = lineup.map((p) => ({
-              id: p.id, name: p.name, pos: p.position || '', ab: 0, r: 0, h: 0, rbi: 0, bb: 0, so: 0,
+              id: p.id, name: p.name, pos: p.position || '', ab: 0, r: 0, h: 0, '2b': 0, '3b': 0, hr: 0, rbi: 0, bb: 0, so: 0,
             }))
           }
         }
