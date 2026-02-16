@@ -2,7 +2,7 @@
   <div id="app">
     <header class="app-header" v-if="!(activeTab === 'play' && gameRef?.isPlaying)">
       <div class="header-inner">
-        <div class="header-logo">
+        <a class="header-logo" href="#" @click.prevent="goHome">
           <svg viewBox="0 0 32 32" class="baseball-icon">
             <circle cx="16" cy="16" r="14" fill="none" stroke="#e94560" stroke-width="2"/>
             <path d="M8 6 Q16 16 8 26" fill="none" stroke="#e94560" stroke-width="1.5"/>
@@ -20,7 +20,7 @@
             <h1>BaseBald</h1>
             <span class="header-subtitle">Powered by real MLB rosters &amp; stats</span>
           </div>
-        </div>
+        </a>
         <nav class="nav-tabs">
           <button
             v-if="activeTab === 'play' && gameRef?.showBackButton"
@@ -57,6 +57,11 @@ import GameView from './components/GameView.vue'
 
 const activeTab = ref('play')
 const gameRef = ref(null)
+
+function goHome() {
+  activeTab.value = 'play'
+  gameRef.value?.resetGame()
+}
 </script>
 
 <style>
@@ -94,6 +99,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .baseball-icon {

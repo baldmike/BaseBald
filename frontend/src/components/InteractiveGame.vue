@@ -213,6 +213,12 @@
         </div>
       </div>
       <button class="play-btn" @click="goToStep(4)" :disabled="!selectedOpponentId" style="margin-top: 20px">Next</button>
+
+      <div v-if="!premiumUnlocked" class="unlock-section">
+        <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
+          Upgrade to Premium to unlock the ability to choose opponents from ANY season — just $3!
+        </a>
+      </div>
     </div>
 
     <!--
@@ -1923,7 +1929,7 @@ const isPlaying = computed(() => !!game.value)
  * - handleBack: navigates back one step in the setup wizard
  * - isPlaying: hides the entire header during active gameplay
  */
-defineExpose({ showBackButton, handleBack, isPlaying })
+defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
 
 </script>
 
