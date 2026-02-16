@@ -22,7 +22,6 @@
     <div v-if="!game && setupStep === 1">
       <!-- Mode picker: three paths forward -->
       <div v-if="!gameMode" class="mode-picker">
-        <h2 class="mode-picker-title">How do you want to play?</h2>
         <div class="mode-picker-grid">
           <button class="mode-card" @click="gameMode = 'season'">
             <span class="mode-icon">&#9918;</span>
