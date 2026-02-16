@@ -775,10 +775,21 @@
       <!--
         Last Play Banner — shows the most recent play description from the backend.
         Styled prominently in yellow on a dark background so the user can see
-        what just happened at a glance.
+        what just happened at a glance. Prev/next arrows let the user browse
+        through the full play_log history.
       -->
-      <div class="last-play" v-if="game.last_play">
-        <p>{{ game.last_play }}</p>
+      <div class="last-play" v-if="game.play_log && game.play_log.length">
+        <button
+          class="play-nav-btn"
+          :disabled="playLogIndex <= 0"
+          @click="playLogIndex--"
+        >&lsaquo;</button>
+        <p class="play-text">{{ game.play_log[playLogIndex] }}</p>
+        <button
+          class="play-nav-btn"
+          :disabled="playLogIndex >= game.play_log.length - 1"
+          @click="playLogIndex++"
+        >&rsaquo;</button>
       </div>
 
       <!--
@@ -1014,6 +1025,9 @@ const loading = ref(false)
 const showScorecard = ref(false)
 const gameOverDismissed = ref(false)
 const gameMode = ref(null)
+
+/** Index into play_log for the outcome banner. Tracks the latest entry by default. */
+const playLogIndex = ref(0)
 
 // ============================================================
 // PREMIUM UNLOCK
@@ -2441,6 +2455,14 @@ watch(
   }
 )
 
+// Auto-advance the outcome banner to the latest entry when new plays are logged
+watch(
+  () => game.value?.play_log?.length,
+  (len) => {
+    if (len) playLogIndex.value = len - 1
+  }
+)
+
 // When home season changes (step 1), re-fetch era-appropriate teams
 watch(selectedSeason, async (newSeason) => {
   if (setupStep.value !== 1) return
@@ -3204,6 +3226,42 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   font-size: 15px;
   color: #e94560;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.last-play .play-text {
+  flex: 1;
+  margin: 0;
+}
+
+/* Prev/next arrows for browsing play history */
+.play-nav-btn {
+  background: transparent;
+  border: 1px solid #e94560;
+  color: #e94560;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.play-nav-btn:hover:not(:disabled) {
+  background: #e94560;
+  color: white;
+}
+
+.play-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 /* ========== Interactive Controls (Pitch/Bat Buttons) ========== */
