@@ -1616,15 +1616,13 @@ function startReplayTimer() {
     game.value = { ...game.value, ...snap }
     // Pause simulation for Aaron 715 announcement
     if (classicLabel.value === "Hank Aaron's 715th Home Run" && !aaronVideoOpened.value) {
-      if (snap.last_play && snap.last_play.toLowerCase().includes('home run')) {
-        const aaronIdx = game.value.home_lineup?.findIndex(b => b.name && b.name.includes('Hank Aaron'))
-        if (aaronIdx >= 0) {
-          const box = snap.home_box_score?.[aaronIdx]
-          if (box && box.hr >= 1) {
-            stopReplayTimer()
-            _triggerAaron715()
-            return
-          }
+      const aaronIdx = game.value.home_lineup?.findIndex(b => b.name && b.name.includes('Hank Aaron'))
+      if (aaronIdx >= 0) {
+        const box = snap.home_box_score?.[aaronIdx]
+        if (box && box.hr >= 1) {
+          stopReplayTimer()
+          _triggerAaron715()
+          return
         }
       }
     }
@@ -1795,12 +1793,10 @@ function _triggerAaron715() {
 function _afterAaron715(state) {
   if (!state || classicLabel.value !== "Hank Aaron's 715th Home Run") return
   if (aaronVideoOpened.value) return
-  if (state.last_play && state.last_play.toLowerCase().includes('home run')) {
-    const aaronIdx = state.home_lineup?.findIndex(b => b.name && b.name.includes('Hank Aaron'))
-    if (aaronIdx === -1 || aaronIdx == null) return
-    const box = state.home_box_score?.[aaronIdx]
-    if (box && box.hr >= 1) _triggerAaron715()
-  }
+  const aaronIdx = state.home_lineup?.findIndex(b => b.name && b.name.includes('Hank Aaron'))
+  if (aaronIdx === -1 || aaronIdx == null) return
+  const box = state.home_box_score?.[aaronIdx]
+  if (box && box.hr >= 1) _triggerAaron715()
 }
 
 function dismissAaronAnnouncement() {
