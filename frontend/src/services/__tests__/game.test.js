@@ -1,5 +1,5 @@
 /**
- * game.test.js — 10-test suite covering core game logic.
+ * game.test.js — 24-test suite covering core game logic.
  * Runs before every deploy to catch regressions.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -22,7 +22,7 @@ import {
   calculateAdjustedTakeOutcomes,
 } from '../statsCalculator.js'
 
-import { processPitch, processAtBat, switchPitcher } from '../gameEngine.js'
+import { processPitch, processAtBat, switchPitcher, attemptSteal, simulateGame } from '../gameEngine.js'
 
 // Helper: build a minimal playable game state
 function makeGameState(overrides = {}) {
@@ -233,5 +233,157 @@ describe('gameEngine', () => {
     // Game should still work normally
     processPitch(state, 'curveball')
     expect(state.home_pitch_count).toBe(1)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 13: processAtBat works when player is batting
+  // ──────────────────────────────────────────────
+  it('processAtBat advances state when player is batting', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    const before = state.play_log.length
+    processAtBat(state, 'swing')
+    expect(state.away_pitch_count).toBe(1)
+    expect(state.play_log.length).toBeGreaterThan(before)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 14: processPitch rejects input when player is batting
+  // ──────────────────────────────────────────────
+  it('processPitch rejects input when player is batting', () => {
+    const state = makeGameState()
+    state.player_role = 'batting'
+    processPitch(state, 'fastball')
+    expect(state.last_play).toMatch(/batting right now/)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 15: attemptSteal succeeds or fails with runner on base
+  // ──────────────────────────────────────────────
+  it('attemptSteal moves runner or records out when runner is on 1st', () => {
+    const state = makeGameState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    attemptSteal(state, 0)
+    // Either the runner advanced to 2nd or was caught stealing
+    if (state.bases[1]) {
+      expect(state.bases[0]).toBe(false)
+      expect(state.last_play).toMatch(/steals 2nd/)
+    } else {
+      expect(state.outs).toBeGreaterThanOrEqual(1)
+      expect(state.last_play).toMatch(/caught stealing/)
+    }
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 16: attemptSteal rejects when no runner on base
+  // ──────────────────────────────────────────────
+  it('attemptSteal rejects when no runner is on the requested base', () => {
+    const state = makeGameState()
+    state.bases = [false, false, false]
+    attemptSteal(state, 0)
+    expect(state.last_play).toMatch(/Can't steal/)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 17: simulateGame runs to completion
+  // ──────────────────────────────────────────────
+  it('simulateGame plays a full game and produces snapshots', () => {
+    const state = makeGameState()
+    const { state: final, snapshots } = simulateGame(state)
+    expect(final.game_status).toBe('final')
+    expect(snapshots.length).toBeGreaterThan(1)
+    expect(final.inning).toBeGreaterThanOrEqual(9)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 18: switchPitcher resolves home splits for home reliever
+  // ──────────────────────────────────────────────
+  it('switchPitcher resolves home splits for a home-side reliever', () => {
+    const state = makeGameState()
+    const reliever = {
+      id: 50, name: 'Split Arm',
+      stats: { era: 4.00, k_per_9: 8.0, bb_per_9: 3.0 },
+      splits: { home: { era: 2.50, k_per_9: 10.0, bb_per_9: 2.0 }, away: { era: 5.50, k_per_9: 6.0, bb_per_9: 4.0 } },
+    }
+    switchPitcher(state, 'home', reliever)
+    expect(state.home_pitcher.activeStats.era).toBe(2.50)
+    expect(state.home_pitcher.activeStats).toBe(reliever.splits.home)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 19: processAtBat auto-replaces fatigued CPU pitcher
+  // ──────────────────────────────────────────────
+  it('processAtBat auto-replaces away pitcher at 100+ pitches', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.away_pitch_count = 100
+    const originalName = state.away_pitcher.name
+    processAtBat(state, 'take')
+    expect(state.away_pitcher.name).toBe('Away Reliever')
+    expect(state.away_pitcher.name).not.toBe(originalName)
+    expect(state.away_pitch_count).toBeLessThanOrEqual(1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// TEST 20: fatigue has no effect below 85 pitches
+// ──────────────────────────────────────────────
+describe('fatigue (extended)', () => {
+  it('applyFatigueMod returns identical weights below 85 pitches', () => {
+    const base = { ...SWING_OUTCOMES.fastball }
+    const result = applyFatigueMod(base, 84)
+    expect(result.single).toBe(base.single)
+    expect(result.homerun).toBe(base.homerun)
+    expect(result.strike_swinging).toBe(base.strike_swinging)
+  })
+})
+
+// ──────────────────────────────────────────────
+// TEST 21: rain weather increases ball probability
+// ──────────────────────────────────────────────
+describe('weather (extended)', () => {
+  it('rain boosts ball weight and reduces strikeout weight', () => {
+    const base = { ball: 50, strike_swinging: 30, single: 10, homerun: 5 }
+    const rainy = applyWeatherModifiers(base, 'rain')
+    expect(rainy.ball).toBeGreaterThan(base.ball)
+    expect(rainy.strike_swinging).toBeLessThan(base.strike_swinging)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 22: dome weather is neutral
+  // ──────────────────────────────────────────────
+  it('dome weather applies no changes to outcome weights', () => {
+    const base = { homerun: 10, flyout: 10, single: 10, ball: 10, strike_swinging: 10 }
+    const domed = applyWeatherModifiers(base, 'dome')
+    for (const key of Object.keys(base)) {
+      expect(domed[key]).toBe(base[key])
+    }
+  })
+})
+
+// ──────────────────────────────────────────────
+// TEST 23: strikeout pitcher increases K weight
+// ──────────────────────────────────────────────
+describe('statsCalculator (extended)', () => {
+  it('high-K pitcher gets more strikeout weight than low-K pitcher', () => {
+    const base = { ...SWING_OUTCOMES.fastball }
+    const flamethrower = calculateAdjustedOutcomes(base, { avg: 0.245, slg: 0.395, k_rate: 0.230 }, { era: 3.00, k_per_9: 12.0 })
+    const softTosser = calculateAdjustedOutcomes(base, { avg: 0.245, slg: 0.395, k_rate: 0.230 }, { era: 3.00, k_per_9: 5.0 })
+    expect(flamethrower.strike_swinging).toBeGreaterThan(softTosser.strike_swinging)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 24: stats calculator preserves total weight after normalization
+  // ──────────────────────────────────────────────
+  it('calculateAdjustedOutcomes preserves approximate total weight', () => {
+    const base = { ...SWING_OUTCOMES.fastball }
+    const totalBefore = Object.values(base).reduce((a, b) => a + b, 0)
+    const adjusted = calculateAdjustedOutcomes(base, { avg: 0.310, slg: 0.520, k_rate: 0.180 })
+    const totalAfter = Object.values(adjusted).reduce((a, b) => a + b, 0)
+    // Normalization brings it close; rounding may shift by a few points
+    expect(Math.abs(totalAfter - totalBefore)).toBeLessThan(totalBefore * 0.10)
   })
 })
