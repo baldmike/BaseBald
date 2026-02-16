@@ -52,6 +52,22 @@
           <span v-if="loadingHomeTeams" class="season-hero-loading">Loading teams...</span>
         </div>
         <TeamSelector :teams="homeTeams" @teamSelected="onTeamSelected" />
+        <div v-if="!premiumUnlocked" class="unlock-section">
+          <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
+            Upgrade to Premium to go back to 1920! — Just $3!
+          </a>
+          <div class="unlock-code-row">
+            <input
+              v-model="unlockCode"
+              type="text"
+              placeholder="Enter Code to Unlock Premium"
+              class="unlock-input"
+              @keyup.enter="tryUnlock"
+            />
+            <button class="unlock-submit" @click="tryUnlock">Unlock</button>
+          </div>
+          <p v-if="unlockError" class="unlock-error">Invalid code. Please try again.</p>
+        </div>
       </div>
 
       <!-- HISTORIC MODE: classic historical matchups -->
@@ -218,6 +234,17 @@
         <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
           Upgrade to Premium to unlock the ability to choose opponents from ANY season — just $3!
         </a>
+        <div class="unlock-code-row">
+          <input
+            v-model="unlockCode"
+            type="text"
+            placeholder="Enter Code to Unlock Premium"
+            class="unlock-input"
+            @keyup.enter="tryUnlock"
+          />
+          <button class="unlock-submit" @click="tryUnlock">Unlock</button>
+        </div>
+        <p v-if="unlockError" class="unlock-error">Invalid code. Please try again.</p>
       </div>
     </div>
 
