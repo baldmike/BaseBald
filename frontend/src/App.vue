@@ -17,7 +17,7 @@
             <line x1="25" y1="21" x2="22" y2="20" stroke="#e94560" stroke-width="1" stroke-linecap="round"/>
           </svg>
           <div class="header-text">
-            <h1>Basebald</h1>
+            <h1>BaseBald</h1>
             <span class="header-subtitle">Powered by real MLB rosters &amp; stats</span>
           </div>
         </div>

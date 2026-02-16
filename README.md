@@ -1,4 +1,4 @@
-# Baseball Game
+# BaseBald
 
 A full-stack interactive baseball game that uses real MLB rosters and player stats. Pick any team and season from 1920–2025, choose your starting pitcher, pick an opponent from any era, then play a full 9-inning game or simulate it with animated play-by-play.
 
