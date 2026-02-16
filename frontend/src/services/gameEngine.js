@@ -10,6 +10,7 @@ import { WEATHER_CONDITIONS, TIME_OF_DAY, getErrorChance } from './weather.js'
 const TOTAL_INNINGS = 9
 const HIT_TYPES = new Set(['single', 'double', 'triple', 'homerun'])
 const OUT_TYPES = new Set(['groundout', 'flyout', 'lineout'])
+const DOUBLE_PLAY_RATE = 0.55  // ~50-60% GIDP rate when DP is in order
 
 function _emptyState() {
   return {
@@ -292,6 +293,52 @@ function _recordHit(state, hitType) {
   }
 }
 
+function _applyDoublePlay(state) {
+  const batterBox = _getBatterBox(state)
+  const pitcherBox = _getPitcherBox(state)
+
+  // Record 2 outs
+  state.outs += 2
+  if (batterBox) batterBox.ab += 1
+  if (pitcherBox) pitcherBox.ip_outs += 2
+
+  // Remove runner from 1st (forced at 2nd), batter out at 1st
+  state.bases[0] = false
+  state.runner_indices[0] = null
+
+  // Advance other runners per force-play rules
+  // Runner on 2nd advances to 3rd (not a force — they move up)
+  // Runner on 3rd scores (not a force — they move up)
+  let runs = 0
+  if (state.bases[2]) {
+    runs += 1
+    _scoreRunner(state, state.runner_indices[2])
+    state.bases[2] = false
+    state.runner_indices[2] = null
+  }
+  if (state.bases[1]) {
+    state.bases[2] = true
+    state.runner_indices[2] = state.runner_indices[1]
+    state.bases[1] = false
+    state.runner_indices[1] = null
+  }
+
+  _scoreRuns(state, runs)
+  _pushScorecardPA(state, 'double_play', runs)
+
+  const dpMsg = `Double play! ${runs > 0 ? runs + ' run(s) score!' : ''}`
+  state.play_log.push(dpMsg)
+  state.last_play = dpMsg
+
+  _resetCount(state)
+  _advanceBatter(state)
+  if (state.outs >= 3) {
+    _endHalfInning(state)
+  } else {
+    _getCurrentBatter(state)
+  }
+}
+
 function _applyOutcome(state, outcome, msg) {
   if (state.is_top) state.home_pitch_count += 1
   else state.away_pitch_count += 1
@@ -335,6 +382,9 @@ function _applyOutcome(state, outcome, msg) {
         state.play_log.push(`${runs} run(s) score!`)
         state.last_play += ` ${runs} run(s) score!`
       }
+    } else if (outcome === 'groundout' && state.bases[0] && state.outs < 2 && Math.random() < DOUBLE_PLAY_RATE) {
+      // Double play: runner on 1st, less than 2 outs
+      _applyDoublePlay(state)
     } else {
       if (batterBox) batterBox.ab += 1
       if (pitcherBox) pitcherBox.ip_outs += 1
@@ -612,7 +662,9 @@ export function processAtBat(state, action) {
 
 // MLB steal success rate ~75%, attempt rate ~0.06 per plate appearance
 const STEAL_SUCCESS_RATE = 0.75
+const STEAL_HOME_SUCCESS_RATE = 0.30  // stealing home is very rare and risky
 const SIM_STEAL_ATTEMPT_RATE = 0.06  // ~1.1 attempts per team per game
+const SIM_STEAL_HOME_ATTEMPT_RATE = 0.005  // extremely rare in sim
 
 /**
  * Attempt a stolen base. baseIdx: 0 = steal 2nd, 1 = steal 3rd.
@@ -620,6 +672,40 @@ const SIM_STEAL_ATTEMPT_RATE = 0.06  // ~1.1 attempts per team per game
  */
 export function attemptSteal(state, baseIdx) {
   if (!state || state.game_status !== 'active') return state || {}
+
+  // Steal home: baseIdx=2, runner on 3rd steals home plate
+  if (baseIdx === 2) {
+    if (!state.bases[2]) {
+      state.last_play = "Can't steal — no runner on 3rd!"
+      return state
+    }
+    const box = state.is_top ? state.away_box_score : state.home_box_score
+    const runnerIdx = state.runner_indices[2]
+    const runnerName = (box && runnerIdx != null) ? box[runnerIdx]?.name || 'Runner' : 'Runner'
+
+    if (Math.random() < STEAL_HOME_SUCCESS_RATE) {
+      _scoreRunner(state, runnerIdx)
+      _scoreRuns(state, 1)
+      state.bases[2] = false
+      state.runner_indices[2] = null
+      if (box && runnerIdx != null && box[runnerIdx]) box[runnerIdx].sb += 1
+      const msg = `${runnerName} steals home! Run scores!`
+      state.play_log.push(msg)
+      state.last_play = msg
+    } else {
+      state.bases[2] = false
+      state.runner_indices[2] = null
+      state.outs += 1
+      const msg = `${runnerName} caught stealing home!`
+      state.play_log.push(msg)
+      state.last_play = msg
+      if (state.outs >= 3) {
+        _endHalfInning(state)
+      }
+    }
+    return state
+  }
+
   if (!state.bases[baseIdx] || state.bases[baseIdx + 1]) {
     state.last_play = "Can't steal — no runner or base occupied!"
     return state
@@ -660,6 +746,11 @@ export function attemptSteal(state, baseIdx) {
  * Called once per plate appearance during simulated games.
  */
 function _maybeSimSteal(state) {
+  // Steal home: extremely rare
+  if (state.bases[2] && Math.random() < SIM_STEAL_HOME_ATTEMPT_RATE) {
+    attemptSteal(state, 2)
+    return
+  }
   if (Math.random() >= SIM_STEAL_ATTEMPT_RATE) return
   // Prefer stealing 2nd (runner on 1st) over 3rd
   if (state.bases[0] && !state.bases[1]) {

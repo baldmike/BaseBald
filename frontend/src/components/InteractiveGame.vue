@@ -344,7 +344,20 @@
         <p>Choose the conditions:</p>
         <div class="weather-grid">
           <button
-            v-for="key in weatherKeys"
+            v-for="key in weatherKeys.slice(0, 4)"
+            :key="key"
+            class="weather-card"
+            :class="{ selected: selectedWeather === key }"
+            @click="selectedWeather = key"
+          >
+            <span class="weather-icon">{{ WEATHER_CONDITIONS[key].icon }}</span>
+            <span class="weather-label">{{ WEATHER_CONDITIONS[key].label }}</span>
+            <span class="weather-detail">{{ WEATHER_CONDITIONS[key].temp }} · {{ WEATHER_CONDITIONS[key].wind }}</span>
+          </button>
+        </div>
+        <div class="weather-grid tod-grid">
+          <button
+            v-for="key in weatherKeys.slice(4)"
             :key="key"
             class="weather-card"
             :class="{ selected: selectedWeather === key }"
@@ -359,7 +372,7 @@
 
       <div v-if="premiumUnlocked" class="weather-selection">
         <p>Time of day:</p>
-        <div class="weather-grid">
+        <div class="weather-grid tod-grid">
           <button
             v-for="key in timeOfDayKeys"
             :key="key"
@@ -369,7 +382,6 @@
           >
             <span class="weather-icon">{{ TIME_OF_DAY[key].icon }}</span>
             <span class="weather-label">{{ TIME_OF_DAY[key].label }}</span>
-            <span class="weather-detail">{{ TIME_OF_DAY[key].desc }}</span>
           </button>
         </div>
       </div>
@@ -663,6 +675,12 @@
               @click="doSteal(1)"
               :disabled="loading"
             >Steal 3rd</button>
+            <button
+              v-if="game.bases[2]"
+              class="action-btn steal-btn"
+              @click="doSteal(2)"
+              :disabled="loading"
+            >Steal Home</button>
           </div>
         </div>
         <button class="action-btn sim-rest-btn" @click="simulateRest()" :disabled="loading">Simulate Rest of Game</button>
@@ -1039,7 +1057,7 @@ const awayVenue = ref(null)
 /**
  * All weather condition keys for the weather picker UI.
  */
-const weatherKeys = Object.keys(WEATHER_CONDITIONS)
+const weatherKeys = ['clear', 'hot', 'wind_out', 'wind_in', 'cold', 'rain', 'dome']
 const timeOfDayKeys = Object.keys(TIME_OF_DAY)
 
 // ============================================================
@@ -1890,7 +1908,7 @@ const canSteal = computed(() => {
   if (!game.value || game.value.game_status !== 'active') return false
   if (game.value.player_role !== 'batting') return false
   const b = game.value.bases
-  return (b[0] && !b[1]) || (b[1] && !b[2])
+  return (b[0] && !b[1]) || (b[1] && !b[2]) || b[2]
 })
 
 function doSteal(baseIdx) {
@@ -3534,6 +3552,14 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   gap: 12px;
   max-width: 640px;
   width: 100%;
+}
+
+.weather-grid + .weather-grid {
+  margin-top: 12px;
+}
+
+.weather-grid.tod-grid {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .weather-card {

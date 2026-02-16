@@ -387,3 +387,249 @@ describe('statsCalculator (extended)', () => {
     expect(Math.abs(totalAfter - totalBefore)).toBeLessThan(totalBefore * 0.10)
   })
 })
+
+// ──────────────────────────────────────────────
+// TEST 25: steal home success scores a run
+// ──────────────────────────────────────────────
+describe('steal home', () => {
+  it('successful steal home scores a run and clears 3rd base', () => {
+    const state = makeGameState()
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 0]
+    const scoreBefore = state.away_total
+    vi.spyOn(Math, 'random').mockReturnValue(0.1) // below 0.30 threshold
+    attemptSteal(state, 2)
+    Math.random.mockRestore()
+    expect(state.bases[2]).toBe(false)
+    expect(state.away_total).toBe(scoreBefore + 1)
+    expect(state.last_play).toMatch(/steals home/)
+    expect(state.away_box_score[0].sb).toBe(1)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 26: steal home caught records an out
+  // ──────────────────────────────────────────────
+  it('caught stealing home records an out and clears 3rd base', () => {
+    const state = makeGameState()
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 0]
+    const outsBefore = state.outs
+    vi.spyOn(Math, 'random').mockReturnValue(0.5) // above 0.30 threshold
+    attemptSteal(state, 2)
+    Math.random.mockRestore()
+    expect(state.bases[2]).toBe(false)
+    expect(state.outs).toBe(outsBefore + 1)
+    expect(state.last_play).toMatch(/caught stealing home/)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 27: steal home rejects when no runner on 3rd
+  // ──────────────────────────────────────────────
+  it('steal home rejects when no runner is on 3rd base', () => {
+    const state = makeGameState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    attemptSteal(state, 2)
+    expect(state.last_play).toMatch(/no runner on 3rd/)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 28: caught stealing home with 2 outs ends the half-inning
+  // ──────────────────────────────────────────────
+  it('caught stealing home with 2 outs ends the half-inning', () => {
+    const state = makeGameState()
+    state.outs = 2
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 0]
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // above 0.30 → caught
+    attemptSteal(state, 2)
+    Math.random.mockRestore()
+    expect(state.outs).toBe(0) // reset after end of half-inning
+    expect(state.bases).toEqual([false, false, false])
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 29: steal home does not credit SB on caught stealing
+  // ──────────────────────────────────────────────
+  it('caught stealing home does not credit a stolen base', () => {
+    const state = makeGameState()
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 0]
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // caught
+    attemptSteal(state, 2)
+    Math.random.mockRestore()
+    expect(state.away_box_score[0].sb).toBe(0)
+  })
+})
+
+// ──────────────────────────────────────────────
+// TEST 30: double play records 2 outs on groundout with runner on 1st
+// ──────────────────────────────────────────────
+describe('double play', () => {
+  it('groundout with runner on 1st and <2 outs can produce a double play', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.outs = 0
+    state._forceNextOutcome = 'groundout'
+    // Mock Math.random: cpuPicksPitch, error chance (high to skip), DP roll (low to trigger)
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP (below 0.55)
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    expect(state.outs).toBeGreaterThanOrEqual(2)
+    expect(state.bases[0]).toBe(false)
+    expect(state.play_log.some(m => m.includes('Double play'))).toBe(true)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 31: no double play with 2 outs
+  // ──────────────────────────────────────────────
+  it('double play does not trigger with 2 outs already', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.outs = 2
+    state._forceNextOutcome = 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // high value skips error
+    processAtBat(state, 'swing')
+    Math.random.mockRestore()
+    // With 2 outs, DP condition (outs < 2) is false, so only 1 out is added → 3 outs → end of inning
+    // The key check: should NOT see "Double play" in the log
+    expect(state.play_log.some(m => m.includes('Double play'))).toBe(false)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 32: no double play on flyout or lineout
+  // ──────────────────────────────────────────────
+  it('double play only triggers on groundouts, not flyouts or lineouts', () => {
+    for (const outType of ['flyout', 'lineout']) {
+      const state = makeGameState()
+      state.is_top = false
+      state.player_role = 'batting'
+      state.bases = [true, false, false]
+      state.runner_indices = [0, null, null]
+      state.outs = 0
+      state._forceNextOutcome = outType
+      vi.spyOn(Math, 'random').mockReturnValue(0.99) // skip error
+      processAtBat(state, 'swing')
+      Math.random.mockRestore()
+      expect(state.play_log.some(m => m.includes('Double play'))).toBe(false)
+    }
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 33: double play with runners on 1st and 2nd advances runner to 3rd
+  // ──────────────────────────────────────────────
+  it('double play with runners on 1st and 2nd advances 2nd to 3rd', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, true, false]
+    state.runner_indices = [0, 1, null]
+    state.outs = 0
+    state._forceNextOutcome = 'groundout'
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    expect(state.bases[0]).toBe(false) // runner removed from 1st
+    expect(state.bases[1]).toBe(false) // 2nd cleared (advanced)
+    expect(state.play_log.some(m => m.includes('Double play'))).toBe(true)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 34: double play with runner on 3rd scores the run
+  // ──────────────────────────────────────────────
+  it('double play with runners on 1st and 3rd scores the runner from 3rd', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, true]
+    state.runner_indices = [0, null, 2]
+    state.outs = 0
+    const scoreBefore = state.home_total
+    state._forceNextOutcome = 'groundout'
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    expect(state.home_total).toBe(scoreBefore + 1)
+    expect(state.bases[2]).toBe(false) // runner scored
+    expect(state.play_log.some(m => m.includes('Double play'))).toBe(true)
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 35: double play with 1 out ends the half-inning
+  // ──────────────────────────────────────────────
+  it('double play with 1 out ends the half-inning (3 outs)', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.outs = 1
+    state._forceNextOutcome = 'groundout'
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    // 1 + 2 = 3 outs → half-inning ends, outs reset to 0
+    expect(state.outs).toBe(0)
+    expect(state.bases).toEqual([false, false, false])
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 36: double play pushes scorecard entry as 'double_play'
+  // ──────────────────────────────────────────────
+  it('double play records a scorecard PA with result double_play', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.outs = 0
+    state._forceNextOutcome = 'groundout'
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    const dpEntry = state.home_scorecard.find(e => e.result === 'double_play')
+    expect(dpEntry).toBeDefined()
+  })
+
+  // ──────────────────────────────────────────────
+  // TEST 37: double play credits pitcher with 2 ip_outs
+  // ──────────────────────────────────────────────
+  it('double play credits the pitcher with 2 ip_outs', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.outs = 0
+    const ipOutsBefore = state.away_pitcher_stats.ip_outs
+    state._forceNextOutcome = 'groundout'
+    const randomMock = vi.spyOn(Math, 'random')
+    randomMock.mockReturnValueOnce(0.5)  // cpuPicksPitch
+      .mockReturnValueOnce(0.99) // skip error
+      .mockReturnValueOnce(0.1)  // trigger DP
+    processAtBat(state, 'swing')
+    randomMock.mockRestore()
+    expect(state.away_pitcher_stats.ip_outs).toBe(ipOutsBefore + 2)
+  })
+})
