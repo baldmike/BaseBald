@@ -692,18 +692,28 @@
             <div class="bullpen-modal">
               <h3 class="bullpen-title">Bullpen</h3>
               <div class="bullpen-list">
-                <button
-                  v-for="p in game.home_bullpen"
-                  :key="p.id"
-                  class="bullpen-option"
-                  @click="doSwitchPitcher(p)"
-                >
-                  <span class="bullpen-name">{{ p.name }}</span>
-                  <span class="bullpen-stats" v-if="p.stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
-                </button>
+                <div v-for="p in game.home_bullpen" :key="p.id" class="bullpen-option">
+                  <div class="bullpen-info">
+                    <span class="bullpen-name">{{ p.name }}</span>
+                    <span class="bullpen-stats" v-if="p.stats">ERA {{ p.stats.era.toFixed(2) }} | K/9 {{ p.stats.k_per_9.toFixed(1) }}</span>
+                  </div>
+                  <div v-if="warmingUp[p.id]" class="warmup-status">
+                    <div class="warmup-bar">
+                      <div class="warmup-fill" :style="{ width: Math.min(100, (warmingUp[p.id].pitches / WARMUP_PITCHES_NEEDED) * 100) + '%' }"></div>
+                    </div>
+                    <span class="warmup-tally">{{ warmingUp[p.id].pitches }}/{{ WARMUP_PITCHES_NEEDED }}</span>
+                    <button v-if="warmingUp[p.id].pitches >= WARMUP_PITCHES_NEEDED" class="bullpen-ready-btn" @click="doSwitchPitcher(p)">Put In</button>
+                  </div>
+                  <button v-else class="warmup-start-btn" @click="startWarmup(p)">Warm Up</button>
+                </div>
               </div>
               <button class="bullpen-cancel" @click="showBullpen = false">Cancel</button>
             </div>
+          </div>
+          <div v-if="Object.keys(warmingUp).length" class="warmup-indicator">
+            <span v-for="(w, id) in warmingUp" :key="id" class="warmup-chip">
+              {{ w.name }}: {{ w.pitches }}/{{ WARMUP_PITCHES_NEEDED }} {{ w.pitches >= WARMUP_PITCHES_NEEDED ? '\u2713' : '' }}
+            </span>
           </div>
           <div v-if="canPickoff" class="button-group pickoff-group">
             <button v-if="game.bases[0]" class="action-btn pickoff-btn" @click="doPickoff(0)" :disabled="loading">
@@ -1322,6 +1332,10 @@ const simTimer = ref(null)
 
 /** Whether the bullpen selection modal is visible. */
 const showBullpen = ref(false)
+
+/** Warmup state: tracks which bullpen pitchers are warming up and their pitch tally. */
+const warmingUp = ref({})  // { pitcherId: { name, pitches } }
+const WARMUP_PITCHES_NEEDED = 25
 
 // ============================================================
 // COMPUTED PROPERTIES
@@ -2110,6 +2124,7 @@ async function resetGame() {
   awayTeams.value = []
   loadingHomeTeams.value = false
   loadingAwayTeams.value = false
+  warmingUp.value = {}
   // Re-fetch teams for default season
   homeTeams.value = await getAllTeams(2025)
 }
@@ -2146,6 +2161,9 @@ function doOver() {
 function doPitch(pitchType) {
   _saveSnapshot()
   processPitch(game.value, pitchType)
+  for (const id in warmingUp.value) {
+    warmingUp.value[id].pitches++
+  }
   game.value = { ...game.value }
 }
 
@@ -2208,6 +2226,9 @@ function doBat(action) {
   _checkAaron715(game.value)
   processAtBat(game.value, action)
   _afterAaron715(game.value)
+  for (const id in warmingUp.value) {
+    warmingUp.value[id].pitches++
+  }
   game.value = { ...game.value }
 }
 
@@ -2278,10 +2299,20 @@ function simulateRest() {
 /**
  * Handle the user selecting a relief pitcher from the bullpen modal.
  */
+function startWarmup(pitcher) {
+  warmingUp.value = { ...warmingUp.value, [pitcher.id]: { name: pitcher.name, pitches: 0 } }
+}
+
 function doSwitchPitcher(reliever) {
+  // Only allow switching if pitcher has warmed up enough
+  const wu = warmingUp.value[reliever.id]
+  if (!wu || wu.pitches < WARMUP_PITCHES_NEEDED) return
   const idx = game.value.home_bullpen.findIndex((p) => p.id === reliever.id)
   if (idx !== -1) game.value.home_bullpen.splice(idx, 1)
   switchPitcher(game.value, 'home', reliever)
+  // Remove the switched pitcher from warmup tracking
+  const { [reliever.id]: _, ...rest } = warmingUp.value
+  warmingUp.value = rest
   showBullpen.value = false
   game.value = { ...game.value }
 }
@@ -3886,15 +3917,10 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   border-radius: 6px;
   padding: 10px 14px;
   color: #e0e0e0;
-  cursor: pointer;
   transition: all 0.2s;
   text-align: left;
   font-size: 14px;
-}
-
-.bullpen-option:hover {
-  border-color: #ff9800;
-  background: #4a4a5a;
+  gap: 10px;
 }
 
 .bullpen-name {
@@ -3921,6 +3947,95 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
 .bullpen-cancel:hover {
   border-color: #e94560;
   color: #e0e0e0;
+}
+
+/* ========== Warmup System ========== */
+.bullpen-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.warmup-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.warmup-bar {
+  width: 60px;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.warmup-fill {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.warmup-tally {
+  font-size: 11px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.warmup-start-btn {
+  background: #3a3a4a;
+  color: #4caf50;
+  border: 1px solid #4caf50;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.warmup-start-btn:hover {
+  background: #4caf50;
+  color: #0a0a1a;
+}
+
+.bullpen-ready-btn {
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.bullpen-ready-btn:hover {
+  background: #66bb6a;
+}
+
+.warmup-indicator {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.warmup-chip {
+  background: #2a2a3a;
+  border: 1px solid #4caf50;
+  color: #4caf50;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 /* ========== Mobile Responsive ========== */
