@@ -79,6 +79,22 @@
               <div class="matchup-decision"><span class="decision-w">W: {{ m.winningPitcher }}</span> · <span class="decision-l">L: {{ m.losingPitcher }}</span></div>
             </button>
           </div>
+          <div v-if="!premiumUnlocked" class="unlock-section">
+            <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
+              Unlock 9 more Historic and 9 more Fantasy Games — Only $3!
+            </a>
+            <div class="unlock-code-row">
+              <input
+                v-model="unlockCode"
+                type="text"
+                placeholder="Enter Code to Unlock Premium"
+                class="unlock-input"
+                @keyup.enter="tryUnlock"
+              />
+              <button class="unlock-submit" @click="tryUnlock">Unlock</button>
+            </div>
+            <p v-if="unlockError" class="unlock-error">Invalid code. Please try again.</p>
+          </div>
         </div>
       </div>
 
@@ -104,6 +120,22 @@
               <div class="matchup-teams">{{ m.away.season }} {{ m.away.name }} vs {{ m.home.season }} {{ m.home.name }}</div>
               <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
             </button>
+          </div>
+          <div v-if="!premiumUnlocked" class="unlock-section">
+            <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
+              Unlock 9 more Historic and 9 more Fantasy Games — Only $3!
+            </a>
+            <div class="unlock-code-row">
+              <input
+                v-model="unlockCode"
+                type="text"
+                placeholder="Enter Code to Unlock Premium"
+                class="unlock-input"
+                @keyup.enter="tryUnlock"
+              />
+              <button class="unlock-submit" @click="tryUnlock">Unlock</button>
+            </div>
+            <p v-if="unlockError" class="unlock-error">Invalid code. Please try again.</p>
           </div>
         </div>
       </div>
@@ -758,6 +790,35 @@ const gameOverDismissed = ref(false)
 const gameMode = ref(null)
 
 // ============================================================
+// PREMIUM UNLOCK
+// ============================================================
+const premiumUnlocked = ref(localStorage.getItem('premiumUnlocked') === 'true')
+const unlockCode = ref('')
+const unlockError = ref(false)
+
+function tryUnlock() {
+  if (unlockCode.value === 'BASEBALD-PREMIUM-8675309') {
+    premiumUnlocked.value = true
+    unlockError.value = false
+    localStorage.setItem('premiumUnlocked', 'true')
+  } else {
+    unlockError.value = true
+  }
+}
+
+const historicalMatchups = computed(() =>
+  premiumUnlocked.value
+    ? [...freeHistoricalMatchups, ...premiumHistoricalMatchups]
+    : freeHistoricalMatchups
+)
+
+const fantasyMatchups = computed(() =>
+  premiumUnlocked.value
+    ? [...freeFantasyMatchups, ...premiumFantasyMatchups]
+    : freeFantasyMatchups
+)
+
+// ============================================================
 // SETUP WIZARD STATE
 // Drives the 4-step pre-game configuration flow.
 // ============================================================
@@ -1025,23 +1086,25 @@ function onToggleSound() {
  * - "Curse Breakers": 2004 Red Sox (broke the Bambino curse) vs 2004 Cardinals
  * - etc.
  */
-const historicalMatchups = [
+const freeHistoricalMatchups = [
   { label: "Babe Ruth's Called Shot", subtitle: '1932 World Series, Game 3', date: 'Oct 1, 1932', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'George Pipgras', losingPitcher: 'Charlie Root', home: { id: 112, name: 'Cubs', season: 1932, pitcherId: 121440, pitcherName: 'Charlie Root' }, away: { id: 147, name: 'Yankees', season: 1932, pitcherId: 120593, pitcherName: 'George Pipgras' } },
   { label: "Don Larsen's Perfect Game", subtitle: '1956 World Series, Game 5', date: 'Oct 8, 1956', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Don Larsen', losingPitcher: 'Sal Maglie', home: { id: 147, name: 'Yankees', season: 1956, pitcherId: 117514, pitcherName: 'Don Larsen' }, away: { id: 119, name: 'Dodgers', season: 1956, pitcherId: 118140, pitcherName: 'Sal Maglie' } },
   { label: "Dock Ellis: Just Say No-No", subtitle: '1970 Regular Season', date: 'Jun 12, 1970', stadium: 'San Diego Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Dave Roberts', home: { id: 135, name: 'Padres', season: 1970, pitcherId: 121276, pitcherName: 'Dave Roberts' }, away: { id: 134, name: 'Pirates', season: 1970, pitcherId: 113815, pitcherName: 'Dock Ellis' } },
   { label: 'History on September 1st, 1971', subtitle: '1971 Regular Season, First All-Black Lineup', date: 'Sep 1, 1971', stadium: 'Three Rivers Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Woodie Fryman', home: { id: 134, name: 'Pirates', season: 1971, pitcherId: 113815, pitcherName: 'Dock Ellis' }, away: { id: 143, name: 'Phillies', season: 1971, pitcherId: 114466, pitcherName: 'Woodie Fryman' } },
   { label: "Hank Aaron's 715th Home Run", subtitle: '1974 Regular Season', date: 'Apr 8, 1974', stadium: 'Atlanta-Fulton County Stadium', weather: 'clear', winningPitcher: 'Ron Reed', losingPitcher: 'Al Downing', home: { id: 144, name: 'Braves', season: 1974, pitcherId: 121001, pitcherName: 'Ron Reed' }, away: { id: 119, name: 'Dodgers', season: 1974, pitcherId: 113515, pitcherName: 'Al Downing' } },
   { label: "3 HR from Mr. October", subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
-  // ── Freemium: unlock the matchups below in a future premium tier ──
-  // { label: 'Disco Demolition Night', subtitle: '1979 Doubleheader — Game 2 Forfeited', date: 'Jul 12, 1979', stadium: 'Comiskey Park', weather: 'hot', winningPitcher: 'Pat Underwood', losingPitcher: 'Ken Kravec', home: { id: 145, name: 'White Sox', season: 1979, pitcherId: 117300, pitcherName: 'Ken Kravec' }, away: { id: 116, name: 'Tigers', season: 1979, pitcherId: 123565, pitcherName: 'Pat Underwood' } },
-  // { label: "Buckner's Demise", subtitle: '1986 World Series, Game 6', date: 'Oct 25, 1986', stadium: 'Shea Stadium', weather: 'cold', winningPitcher: 'Rick Aguilera', losingPitcher: 'Calvin Schiraldi', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 119964, pitcherName: 'Bob Ojeda' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
-  // { label: "Nolan Ryan's 7th No-Hitter", subtitle: '1991 Regular Season — 44 Years Old', date: 'May 1, 1991', stadium: 'Arlington Stadium', weather: 'clear', winningPitcher: 'Nolan Ryan', losingPitcher: 'Jimmy Key', home: { id: 140, name: 'Rangers', season: 1991, pitcherId: 121597, pitcherName: 'Nolan Ryan' }, away: { id: 141, name: 'Blue Jays', season: 1991, pitcherId: 117032, pitcherName: 'Jimmy Key' } },
-  // { label: "McGwire's 62nd Home Run", subtitle: '1998 Regular Season', date: 'Sep 8, 1998', stadium: 'Busch Stadium', weather: 'hot', winningPitcher: 'Kent Mercker', losingPitcher: 'Steve Trachsel', home: { id: 138, name: 'Cardinals', season: 1998, pitcherId: 118967, pitcherName: 'Kent Mercker' }, away: { id: 112, name: 'Cubs', season: 1998, pitcherId: 123431, pitcherName: 'Steve Trachsel' } },
-  // { label: 'Sammy Sosa Corked Bat Game', subtitle: '2003 Regular Season', date: 'Jun 3, 2003', stadium: 'Wrigley Field', weather: 'wind_out', winningPitcher: 'Mike Remlinger', losingPitcher: 'Al Levine', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 139, name: 'Devil Rays', season: 2003, pitcherId: 114928, pitcherName: 'Geremi Gonzalez' } },
-  // { label: 'The Bartman Game', subtitle: '2003 NLCS, Game 6', date: 'Oct 14, 2003', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'Josh Beckett', losingPitcher: 'Mark Prior', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 146, name: 'Marlins', season: 2003, pitcherId: 150230, pitcherName: 'Mark Redman' } },
-  // { label: 'Game 4 World Series Sweep', subtitle: '2005 World Series, Game 4', date: 'Oct 26, 2005', stadium: 'Minute Maid Park', weather: 'dome', winningPitcher: 'Freddy Garcia', losingPitcher: 'Brad Lidge', home: { id: 117, name: 'Astros', season: 2005, pitcherId: 407840, pitcherName: 'Brandon Backe' }, away: { id: 145, name: 'White Sox', season: 2005, pitcherId: 150119, pitcherName: 'Freddy Garcia' } },
-  // { label: "Buehrle's Perfect Game", subtitle: '2009 Regular Season', date: 'Jul 23, 2009', stadium: 'U.S. Cellular Field', weather: 'hot', winningPitcher: 'Mark Buehrle', losingPitcher: 'Scott Kazmir', home: { id: 145, name: 'White Sox', season: 2009, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 139, name: 'Rays', season: 2009, pitcherId: 431148, pitcherName: 'Scott Kazmir' } },
-  // { label: 'Cubs Break the Curse — Game 7', subtitle: '2016 World Series, Game 7', date: 'Nov 2, 2016', stadium: 'Progressive Field', weather: 'rain', winningPitcher: 'Mike Montgomery', losingPitcher: 'Bryan Shaw', home: { id: 114, name: 'Indians', season: 2016, pitcherId: 446372, pitcherName: 'Corey Kluber' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
+]
+
+const premiumHistoricalMatchups = [
+  { label: 'Disco Demolition Night', subtitle: '1979 Doubleheader — Game 2 Forfeited', date: 'Jul 12, 1979', stadium: 'Comiskey Park', weather: 'hot', winningPitcher: 'Pat Underwood', losingPitcher: 'Ken Kravec', home: { id: 145, name: 'White Sox', season: 1979, pitcherId: 117300, pitcherName: 'Ken Kravec' }, away: { id: 116, name: 'Tigers', season: 1979, pitcherId: 123565, pitcherName: 'Pat Underwood' } },
+  { label: "Buckner's Demise", subtitle: '1986 World Series, Game 6', date: 'Oct 25, 1986', stadium: 'Shea Stadium', weather: 'cold', winningPitcher: 'Rick Aguilera', losingPitcher: 'Calvin Schiraldi', home: { id: 121, name: 'Mets', season: 1986, pitcherId: 119964, pitcherName: 'Bob Ojeda' }, away: { id: 111, name: 'Red Sox', season: 1986, pitcherId: 112388, pitcherName: 'Roger Clemens' } },
+  { label: "Nolan Ryan's 7th No-Hitter", subtitle: '1991 Regular Season — 44 Years Old', date: 'May 1, 1991', stadium: 'Arlington Stadium', weather: 'clear', winningPitcher: 'Nolan Ryan', losingPitcher: 'Jimmy Key', home: { id: 140, name: 'Rangers', season: 1991, pitcherId: 121597, pitcherName: 'Nolan Ryan' }, away: { id: 141, name: 'Blue Jays', season: 1991, pitcherId: 117032, pitcherName: 'Jimmy Key' } },
+  { label: "McGwire's 62nd Home Run", subtitle: '1998 Regular Season', date: 'Sep 8, 1998', stadium: 'Busch Stadium', weather: 'hot', winningPitcher: 'Kent Mercker', losingPitcher: 'Steve Trachsel', home: { id: 138, name: 'Cardinals', season: 1998, pitcherId: 118967, pitcherName: 'Kent Mercker' }, away: { id: 112, name: 'Cubs', season: 1998, pitcherId: 123431, pitcherName: 'Steve Trachsel' } },
+  { label: 'Sammy Sosa Corked Bat Game', subtitle: '2003 Regular Season', date: 'Jun 3, 2003', stadium: 'Wrigley Field', weather: 'wind_out', winningPitcher: 'Mike Remlinger', losingPitcher: 'Al Levine', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 139, name: 'Devil Rays', season: 2003, pitcherId: 114928, pitcherName: 'Geremi Gonzalez' } },
+  { label: 'The Bartman Game', subtitle: '2003 NLCS, Game 6', date: 'Oct 14, 2003', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'Josh Beckett', losingPitcher: 'Mark Prior', home: { id: 112, name: 'Cubs', season: 2003, pitcherId: 407578, pitcherName: 'Mark Prior' }, away: { id: 146, name: 'Marlins', season: 2003, pitcherId: 150230, pitcherName: 'Mark Redman' } },
+  { label: 'Game 4 World Series Sweep', subtitle: '2005 World Series, Game 4', date: 'Oct 26, 2005', stadium: 'Minute Maid Park', weather: 'dome', winningPitcher: 'Freddy Garcia', losingPitcher: 'Brad Lidge', home: { id: 117, name: 'Astros', season: 2005, pitcherId: 407840, pitcherName: 'Brandon Backe' }, away: { id: 145, name: 'White Sox', season: 2005, pitcherId: 150119, pitcherName: 'Freddy Garcia' } },
+  { label: "Buehrle's Perfect Game", subtitle: '2009 Regular Season', date: 'Jul 23, 2009', stadium: 'U.S. Cellular Field', weather: 'hot', winningPitcher: 'Mark Buehrle', losingPitcher: 'Scott Kazmir', home: { id: 145, name: 'White Sox', season: 2009, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 139, name: 'Rays', season: 2009, pitcherId: 431148, pitcherName: 'Scott Kazmir' } },
+  { label: 'Cubs Break the Curse — Game 7', subtitle: '2016 World Series, Game 7', date: 'Nov 2, 2016', stadium: 'Progressive Field', weather: 'rain', winningPitcher: 'Mike Montgomery', losingPitcher: 'Bryan Shaw', home: { id: 114, name: 'Indians', season: 2016, pitcherId: 446372, pitcherName: 'Corey Kluber' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
 ]
 
 /**
@@ -1051,23 +1114,25 @@ const historicalMatchups = [
  * Numbered #1–#15 in the UI via template index.
  * Same shape as historicalMatchups but without date/stadium/weather/winner fields.
  */
-const fantasyMatchups = [
+const freeFantasyMatchups = [
   { label: 'Crosstown Classic', subtitle: 'Getcher pops from da Jewels, grab a seat in the frunchroom and watch your team win by a couple two tree.', home: { id: 145, name: 'White Sox', season: 2005, pitcherId: 279824, pitcherName: 'Mark Buehrle' }, away: { id: 112, name: 'Cubs', season: 2016, pitcherId: 543294, pitcherName: 'Kyle Hendricks' } },
   { label: 'Coast to Coast', subtitle: 'Mantle vs Ohtani', home: { id: 119, name: 'Dodgers', season: 2024, pitcherId: 808967, pitcherName: 'Yoshinobu Yamamoto' }, away: { id: 147, name: 'Yankees', season: 1956, pitcherId: 114299, pitcherName: 'Whitey Ford' } },
   { label: "Bizarro '69 World Series", subtitle: 'The Seattle Pilots: What a Year.', home: { id: 158, name: 'Pilots', season: 1969, pitcherId: 111279, pitcherName: 'Jim Bouton' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
   { label: 'Pitching Duel', subtitle: 'Old School Duel', home: { id: 138, name: 'Cardinals', season: 1968, pitcherId: 114756, pitcherName: 'Bob Gibson' }, away: { id: 119, name: 'Dodgers', season: 1963, pitcherId: 117277, pitcherName: 'Sandy Koufax' } },
   { label: "Big Red Machine vs Murderer's Row", subtitle: "You've waited long enough.", home: { id: 147, name: 'Yankees', season: 1927, pitcherId: 116241, pitcherName: 'Waite Hoyt' }, away: { id: 113, name: 'Reds', season: 1975, pitcherId: 115239, pitcherName: 'Don Gullett' } },
   { label: 'Battle for The Bottom', subtitle: 'Worst of the Worst', home: { id: 145, name: 'White Sox', season: 2024, pitcherId: 676979, pitcherName: 'Garrett Crochet' }, away: { id: 121, name: 'Mets', season: 1962, pitcherId: 112783, pitcherName: 'Roger Craig' } },
-  // ── Freemium: unlock the matchups below in a future premium tier ──
-  // { label: 'Subway Series', subtitle: "New York's Finest", home: { id: 147, name: 'Yankees', season: 1998, pitcherId: 112388, pitcherName: 'Roger Clemens' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
-  // { label: 'Rookie Dual', subtitle: 'Fernando Valenzuela vs Albert Pujols', home: { id: 138, name: 'Cardinals', season: 2001, pitcherId: 119403, pitcherName: 'Matt Morris' }, away: { id: 119, name: 'Dodgers', season: 1981, pitcherId: 123619, pitcherName: 'Fernando Valenzuela' } },
-  // { label: 'Bay Bridge Series', subtitle: 'Bash Brothers vs Say Hey Kid', home: { id: 137, name: 'Giants', season: 1962, pitcherId: 118283, pitcherName: 'Juan Marichal' }, away: { id: 133, name: 'Athletics', season: 1989, pitcherId: 122775, pitcherName: 'Dave Stewart' } },
-  // { label: 'Freeway Series', subtitle: 'SoCal Battle between Gwynn and Nolan Ryan', home: { id: 135, name: 'Padres', season: 1984, pitcherId: 122197, pitcherName: 'Eric Show' }, away: { id: 108, name: 'Angels', season: 1979, pitcherId: 121597, pitcherName: 'Nolan Ryan' } },
-  // { label: '116', subtitle: 'Tied for Most Wins', home: { id: 112, name: 'Cubs', season: 1906, pitcherId: 111577, pitcherName: 'Mordecai Brown' }, away: { id: 136, name: 'Mariners', season: 2001, pitcherId: 114587, pitcherName: 'Freddy Garcia' } },
-  // { label: 'Cursed/Blessed', subtitle: 'One curse closes, another one opens', home: { id: 111, name: 'Red Sox', season: 2004, pitcherId: 121811, pitcherName: 'Curt Schilling' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
-  // { label: 'Moneyball vs Big Spenders', subtitle: 'Small Budget, Big Dreams', home: { id: 133, name: 'Athletics', season: 2002, pitcherId: 217096, pitcherName: 'Barry Zito' }, away: { id: 140, name: 'Rangers', season: 2023, pitcherId: 453286, pitcherName: 'Max Scherzer' } },
-  // { label: 'The Revenge Match', subtitle: 'Pirates Beat Orioles 1971 WS', home: { id: 110, name: 'Orioles', season: 1971, pitcherId: 120196, pitcherName: 'Jim Palmer' }, away: { id: 134, name: 'Pirates', season: 1979, pitcherId: 111952, pitcherName: 'John Candelaria' } },
-  // { label: 'North of the Border', subtitle: "Canada's Finest", home: { id: 141, name: 'Blue Jays', season: 1993, pitcherId: 115267, pitcherName: 'Juan Guzman' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
+]
+
+const premiumFantasyMatchups = [
+  { label: 'Subway Series', subtitle: "New York's Finest", home: { id: 147, name: 'Yankees', season: 1998, pitcherId: 112388, pitcherName: 'Roger Clemens' }, away: { id: 121, name: 'Mets', season: 1969, pitcherId: 121961, pitcherName: 'Tom Seaver' } },
+  { label: 'Rookie Dual', subtitle: 'Fernando Valenzuela vs Albert Pujols', home: { id: 138, name: 'Cardinals', season: 2001, pitcherId: 119403, pitcherName: 'Matt Morris' }, away: { id: 119, name: 'Dodgers', season: 1981, pitcherId: 123619, pitcherName: 'Fernando Valenzuela' } },
+  { label: 'Bay Bridge Series', subtitle: 'Bash Brothers vs Say Hey Kid', home: { id: 137, name: 'Giants', season: 1962, pitcherId: 118283, pitcherName: 'Juan Marichal' }, away: { id: 133, name: 'Athletics', season: 1989, pitcherId: 122775, pitcherName: 'Dave Stewart' } },
+  { label: 'Freeway Series', subtitle: 'SoCal Battle between Gwynn and Nolan Ryan', home: { id: 135, name: 'Padres', season: 1984, pitcherId: 122197, pitcherName: 'Eric Show' }, away: { id: 108, name: 'Angels', season: 1979, pitcherId: 121597, pitcherName: 'Nolan Ryan' } },
+  { label: '116', subtitle: 'Tied for Most Wins', home: { id: 112, name: 'Cubs', season: 1906, pitcherId: 111577, pitcherName: 'Mordecai Brown' }, away: { id: 136, name: 'Mariners', season: 2001, pitcherId: 114587, pitcherName: 'Freddy Garcia' } },
+  { label: 'Cursed/Blessed', subtitle: 'One curse closes, another one opens', home: { id: 111, name: 'Red Sox', season: 2004, pitcherId: 121811, pitcherName: 'Curt Schilling' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
+  { label: 'Moneyball vs Big Spenders', subtitle: 'Small Budget, Big Dreams', home: { id: 133, name: 'Athletics', season: 2002, pitcherId: 217096, pitcherName: 'Barry Zito' }, away: { id: 140, name: 'Rangers', season: 2023, pitcherId: 453286, pitcherName: 'Max Scherzer' } },
+  { label: 'The Revenge Match', subtitle: 'Pirates Beat Orioles 1971 WS', home: { id: 110, name: 'Orioles', season: 1971, pitcherId: 120196, pitcherName: 'Jim Palmer' }, away: { id: 134, name: 'Pirates', season: 1979, pitcherId: 111952, pitcherName: 'John Candelaria' } },
+  { label: 'North of the Border', subtitle: "Canada's Finest", home: { id: 141, name: 'Blue Jays', season: 1993, pitcherId: 115267, pitcherName: 'Juan Guzman' }, away: { id: 120, name: 'Expos', season: 1994, pitcherId: 118377, pitcherName: 'Pedro Martinez' } },
 ]
 
 /**
@@ -2819,6 +2884,78 @@ defineExpose({ showBackButton, handleBack, isPlaying })
   border-color: #e94560;
   background: #f5f5f5;
   transform: translateY(-1px);
+}
+
+/* Unlock section below matchup grids */
+.unlock-section {
+  max-width: 420px;
+  margin: 18px auto 0;
+  text-align: center;
+}
+
+.unlock-code-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.unlock-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.unlock-input:focus {
+  border-color: #d4a017;
+}
+
+.unlock-submit {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #d4a017, #f0c040);
+  color: #1a1a2e;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.unlock-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(212, 160, 23, 0.4);
+}
+
+.unlock-error {
+  color: #e94560;
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+}
+
+.unlock-btn {
+  display: block;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #d4a017, #f0c040);
+  color: #1a1a2e;
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(212, 160, 23, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.unlock-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(212, 160, 23, 0.5);
 }
 
 /* Matchup name label (e.g., "Crosstown Classic") — red for emphasis */

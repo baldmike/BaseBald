@@ -3,5 +3,8 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/baseball-game/'
+  base: '/baseball-game/',
+  test: {
+    environment: 'jsdom',
+  },
 })
