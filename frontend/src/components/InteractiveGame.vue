@@ -878,7 +878,10 @@ const selectedSeason = ref(2025)
  * most recent (and most complete data) seasons appear first.
  * Spans from 1920 (start of the "live ball era") to 2025.
  */
-const availableSeasons = Array.from({ length: 2025 - 1920 + 1 }, (_, i) => 2025 - i)
+const availableSeasons = computed(() => {
+  const earliest = premiumUnlocked.value ? 1920 : 2000
+  return Array.from({ length: 2025 - earliest + 1 }, (_, i) => 2025 - i)
+})
 
 /**
  * Loading flag for the home team's pitcher list API call.
