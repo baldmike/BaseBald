@@ -642,13 +642,12 @@
       -->
       <div v-if="simulating" class="sim-controls">
         <div class="mode-label">Simulation in progress</div>
-        <div class="button-group">
-          <!-- Each speed button highlights when it matches the current simSpeed -->
-          <button class="action-btn speed-btn" :class="{ active: simSpeed === 2000 }" @click="setSimSpeed(2000)">Slow</button>
-          <button class="action-btn speed-btn" :class="{ active: simSpeed === 1000 }" @click="setSimSpeed(1000)">Normal</button>
-          <button class="action-btn speed-btn" :class="{ active: simSpeed === 300 }" @click="setSimSpeed(300)">Fast</button>
-          <!-- Skip to End: stops the timer and jumps to the last snapshot -->
-          <button class="action-btn speed-btn skip" @click="skipToEnd()">Skip to End</button>
+        <div class="tape-deck">
+          <button class="deck-btn" :class="{ active: simSpeed === 2000 }" @click="setSimSpeed(2000)" title="Slow">&#9664;</button>
+          <button class="deck-btn" :class="{ active: simSpeed === 1000 }" @click="setSimSpeed(1000)" title="Normal">&#9654;</button>
+          <button class="deck-btn" :class="{ active: simSpeed === 300 }" @click="setSimSpeed(300)" title="Fast">&#9654;&#9654;</button>
+          <button class="deck-btn deck-pause" :class="{ active: simPaused }" @click="toggleSimPause()" title="Pause / Resume"></button>
+          <button class="deck-btn deck-stop" @click="skipToEnd()" title="Skip to End">&#9632;</button>
         </div>
         <button class="action-btn takeover-btn" @click="takeOverGame()">Take Over &amp; Play</button>
       </div>
@@ -756,6 +755,7 @@
             >Steal Home</button>
           </div>
         </div>
+        <button v-if="lastSnapshot" class="action-btn doover-btn" @click="doOver()" :disabled="loading">Do Over!</button>
         <button class="action-btn sim-rest-btn" @click="simulateRest()" :disabled="loading">Simulate Rest of Game</button>
       </div>
 
@@ -1142,7 +1142,7 @@ const classicMatchupData = ref(null)
  * Auto-set from historical matchup data or manually chosen on step 6.
  */
 const selectedWeather = ref('clear')
-const selectedTimeOfDay = ref(null)
+const selectedTimeOfDay = ref('day')
 
 /** Dock Ellis LSD no-hitter — special theming on the weather/time-of-day screen. */
 const isDockEllis = computed(() => classicLabel.value === 'Dock Ellis: Just Say No-No')
@@ -1288,6 +1288,7 @@ const timeOfDayKeys = Object.keys(TIME_OF_DAY)
  * When true, the speed controls are shown and game controls are hidden.
  */
 const simulating = ref(false)
+const simPaused = ref(false)
 
 /**
  * Array of game state snapshot objects from the backend's simulation.
@@ -1963,7 +1964,7 @@ function startReplayTimer() {
     // Check if we've reached the end of the snapshots
     if (simReplayIndex.value >= simSnapshots.value.length) {
       stopReplayTimer()
-      simulating.value = false  // Exit simulation mode
+      simulating.value = false; simPaused.value = false  // Exit simulation mode
       return
     }
     // Merge the next snapshot into the current game state.
@@ -2006,10 +2007,20 @@ function stopReplayTimer() {
  * @param {number} ms - Milliseconds between snapshot advances.
  *                      2000 = slow, 1000 = normal, 300 = fast.
  */
+function toggleSimPause() {
+  if (simPaused.value) {
+    simPaused.value = false
+    startReplayTimer()
+  } else {
+    simPaused.value = true
+    stopReplayTimer()
+  }
+}
+
 function setSimSpeed(ms) {
   simSpeed.value = ms
   // Only restart the timer if a simulation is currently running
-  if (simulating.value) {
+  if (simulating.value && !simPaused.value) {
     startReplayTimer()
   }
 }
@@ -2021,7 +2032,7 @@ function setSimSpeed(ms) {
  */
 function skipToEnd() {
   stopReplayTimer()
-  simulating.value = false
+  simulating.value = false; simPaused.value = false
   if (simSnapshots.value.length > 0) {
     // Jump to the very last snapshot
     simReplayIndex.value = simSnapshots.value.length - 1
@@ -2035,7 +2046,7 @@ function skipToEnd() {
  */
 function takeOverGame() {
   stopReplayTimer()
-  simulating.value = false
+  simulating.value = false; simPaused.value = false
   simSnapshots.value = []
   // The current game.value already reflects the snapshot state.
   // Add a play log entry so the user knows what happened.
@@ -2075,7 +2086,7 @@ async function resetGame() {
   showDiscoVideo.value = false
   gameMode.value = null
   stopReplayTimer()
-  simulating.value = false
+  simulating.value = false; simPaused.value = false
   simSnapshots.value = []
   simReplayIndex.value = 0
   classicMode.value = false
@@ -2092,7 +2103,7 @@ async function resetGame() {
   awayPitcherList.value = []
   selectedAwayPitcherId.value = null
   selectedWeather.value = 'clear'
-  selectedTimeOfDay.value = null
+  selectedTimeOfDay.value = 'day'
   selectedVenue.value = ''
   homeVenue.value = null
   awayVenue.value = null
@@ -2107,6 +2118,25 @@ async function resetGame() {
 // GAME ACTION FUNCTIONS
 // ============================================================
 
+/** Deep-clone the game state for Do Over snapshots */
+const lastSnapshot = ref(null)
+
+function _saveSnapshot() {
+  const g = game.value
+  lastSnapshot.value = JSON.parse(JSON.stringify({
+    ...g,
+    _outcomeFilter: undefined,
+  }))
+  // Preserve the non-serializable filter
+  if (g._outcomeFilter) lastSnapshot.value._outcomeFilter = g._outcomeFilter
+}
+
+function doOver() {
+  if (!lastSnapshot.value) return
+  game.value = lastSnapshot.value
+  lastSnapshot.value = null
+}
+
 /**
  * Send a pitch to the backend (used when the player is pitching).
  * Updates the game state with the pitch outcome (ball, strike, hit, etc.).
@@ -2114,6 +2144,7 @@ async function resetGame() {
  * @param {string} pitchType - One of 'fastball', 'curveball', 'slider', 'changeup'
  */
 function doPitch(pitchType) {
+  _saveSnapshot()
   processPitch(game.value, pitchType)
   game.value = { ...game.value }
 }
@@ -2173,6 +2204,7 @@ function dismissAaronAnnouncement() {
 }
 
 function doBat(action) {
+  _saveSnapshot()
   _checkAaron715(game.value)
   processAtBat(game.value, action)
   _afterAaron715(game.value)
@@ -2198,6 +2230,7 @@ const canSteal = computed(() => {
  * The steal + pitch happen as a single action from the player's perspective.
  */
 function doSteal(baseIdx) {
+  _saveSnapshot()
   attemptSteal(game.value, baseIdx)
   // A steal happens during a pitch — the batter takes while the runner goes.
   // Only process the pitch if the half-inning didn't end (caught stealing for 3rd out).
@@ -2222,6 +2255,7 @@ const canPickoff = computed(() => {
  * the pickoff replaces the pitch (the pitcher threw to the base instead of home).
  */
 function doPickoff(baseIdx) {
+  _saveSnapshot()
   attemptPickoff(game.value, baseIdx)
   game.value = { ...game.value }
 }
@@ -3141,6 +3175,24 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   color: #e0e0e0;
 }
 
+.doover-btn {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  color: #f0c040;
+  border: 1px solid #f0c040;
+  padding: 6px 18px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.doover-btn:hover:not(:disabled) {
+  background: #f0c040;
+  color: #0a0a1a;
+}
+
 .steal-group {
   margin-top: 8px;
 }
@@ -3341,39 +3393,95 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   margin: 16px 0;
 }
 
-/* Speed control buttons — smaller than action buttons, neutral gray */
-.speed-btn {
-  background: #3a3a4a;
-  color: #e0e0e0;
-  border-color: #555;
-  min-width: 80px;
-  padding: 8px 16px;
-  font-size: 14px;
+/* Tape deck transport controls */
+.tape-deck {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  background: #1a1a1a;
+  border: 2px solid #444;
+  border-radius: 10px;
+  padding: 8px 12px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05);
 }
 
-/* Active speed button: filled red to indicate which speed is currently selected */
-.speed-btn.active {
-  border-color: #e94560;
+.deck-btn {
+  background: #2a2a2a;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  width: 48px;
+  height: 40px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 0 #111;
+  letter-spacing: -2px;
+}
+
+.deck-btn:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.deck-btn:active {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.deck-btn.active {
   background: #e94560;
-  color: white;
+  color: #fff;
+  border-color: #e94560;
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
 }
 
-/* Speed button hover: red border feedback */
-.speed-btn:hover:not(:disabled) {
-  border-color: #e94560;
+.deck-pause {
+  position: relative;
+  gap: 3px;
 }
 
-/* "Skip to End" button — yellow border/text to differentiate from speed buttons.
-   Yellow = caution/attention, appropriate for an action that skips content. */
-.speed-btn.skip {
-  border-color: #e94560;
+.deck-pause::before,
+.deck-pause::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 14px;
+  background: #ccc;
+  border-radius: 1px;
+}
+
+.deck-pause:hover::before,
+.deck-pause:hover::after {
+  background: #fff;
+}
+
+.deck-pause.active::before,
+.deck-pause.active::after {
+  background: #fff;
+}
+
+.deck-stop {
   color: #e94560;
+  font-size: 0;
+  letter-spacing: 0;
+  position: relative;
 }
 
-/* Skip button hover: fills with yellow, text goes dark for contrast */
-.speed-btn.skip:hover:not(:disabled) {
+.deck-stop::after {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 14px;
   background: #e94560;
-  color: #0a0a1a;
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+}
+
+.deck-stop:hover::after {
+  background: #fff;
 }
 
 .takeover-btn {
@@ -3908,10 +4016,10 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   }
 
   /* Speed buttons: smaller */
-  .speed-btn {
-    min-width: 60px;
-    padding: 6px 10px;
-    font-size: 12px;
+  .deck-btn {
+    width: 40px;
+    height: 34px;
+    font-size: 13px;
   }
 
   /* Last play banner: smaller text */
