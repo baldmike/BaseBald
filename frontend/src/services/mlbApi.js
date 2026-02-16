@@ -4,7 +4,6 @@
  */
 
 const MLB_BASE = 'https://statsapi.mlb.com'
-const CORS_PROXY = 'https://api.allorigins.win/raw?url='
 
 /** Minor league team IDs mapped to their sportId (for stats queries). */
 const MINOR_LEAGUE_TEAMS = { 247: 12 } // Birmingham Barons = Double-A
@@ -17,7 +16,7 @@ function sportIdForTeam(teamId) {
 }
 
 async function mlbFetch(path) {
-  const url = `${CORS_PROXY}${encodeURIComponent(`${MLB_BASE}${path}`)}`
+  const url = `${MLB_BASE}${path}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`MLB API error: ${res.status}`)
   return res.json()
