@@ -22,7 +22,7 @@ import {
   calculateAdjustedTakeOutcomes,
 } from '../statsCalculator.js'
 
-import { processPitch, processAtBat, switchPitcher, attemptSteal, simulateGame } from '../gameEngine.js'
+import { processPitch, processAtBat, switchPitcher, attemptSteal, attemptPickoff, simulateGame } from '../gameEngine.js'
 
 // Helper: build a minimal playable game state
 function makeGameState(overrides = {}) {
@@ -459,6 +459,68 @@ describe('steal home', () => {
     attemptSteal(state, 2)
     Math.random.mockRestore()
     expect(state.away_box_score[0].sb).toBe(0)
+  })
+})
+
+// ──────────────────────────────────────────────
+// PICKOFF TESTS
+// ──────────────────────────────────────────────
+describe('pickoff', () => {
+  it('successful pickoff clears the base and records an out', () => {
+    const state = makeGameState()
+    state.player_role = 'pitching'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    vi.spyOn(Math, 'random').mockReturnValue(0.05) // below 0.15
+    attemptPickoff(state, 0)
+    Math.random.mockRestore()
+    expect(state.bases[0]).toBe(false)
+    expect(state.outs).toBe(1)
+    expect(state.last_play).toMatch(/Picked off/)
+  })
+
+  it('failed pickoff leaves runner on base and adds no out', () => {
+    const state = makeGameState()
+    state.player_role = 'pitching'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    const outsBefore = state.outs
+    vi.spyOn(Math, 'random').mockReturnValue(0.5) // above 0.15
+    attemptPickoff(state, 0)
+    Math.random.mockRestore()
+    expect(state.bases[0]).toBe(true)
+    expect(state.outs).toBe(outsBefore)
+    expect(state.last_play).toMatch(/safe/)
+  })
+
+  it('rejects pickoff when player is batting', () => {
+    const state = makeGameState()
+    state.player_role = 'batting'
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    attemptPickoff(state, 0)
+    expect(state.last_play).toMatch(/only attempt a pickoff while pitching/)
+  })
+
+  it('rejects pickoff when no runner on the target base', () => {
+    const state = makeGameState()
+    state.player_role = 'pitching'
+    state.bases = [false, false, false]
+    attemptPickoff(state, 0)
+    expect(state.last_play).toMatch(/no runner/)
+  })
+
+  it('successful pickoff with 2 outs ends the half-inning', () => {
+    const state = makeGameState()
+    state.player_role = 'pitching'
+    state.outs = 2
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    vi.spyOn(Math, 'random').mockReturnValue(0.05) // below 0.15
+    attemptPickoff(state, 0)
+    Math.random.mockRestore()
+    expect(state.outs).toBe(0) // reset after end of half-inning
+    expect(state.bases).toEqual([false, false, false])
   })
 })
 

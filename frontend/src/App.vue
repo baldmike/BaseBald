@@ -18,7 +18,7 @@
           </svg>
           <div class="header-text">
             <h1>BaseBald</h1>
-            <span class="header-subtitle">Powered by real MLB rosters &amp; stats</span>
+            <span class="header-subtitle">Powered by 100% All-Natural MLB rosters, stats and guts.</span>
           </div>
         </a>
         <nav class="nav-tabs">

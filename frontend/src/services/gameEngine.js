@@ -1,28 +1,79 @@
 /**
  * gameEngine.js — Core game logic and state management.
  * Ported from game_engine.py. Operates on plain state objects.
+ *
+ * This is the heart of the baseball simulation. Every pitch, hit, out, steal,
+ * and double play flows through this module. It tracks all game state including
+ * the scoreboard, base runners, box scores, pitch counts, and play-by-play log.
+ *
+ * ALL FEATURES IN THIS FILE ARE FREE — the game engine has no premium gating.
+ * Premium vs free distinctions live entirely in the UI layer (InteractiveGame.vue),
+ * which controls what teams/seasons/options the player can select before a game
+ * starts. Once a game is created, all mechanics are available to all users.
+ *
+ * Key subsystems:
+ *   - Count tracking: balls, strikes, fouls → walks and strikeouts
+ *   - Hit resolution: singles, doubles, triples, home runs → runner advancement
+ *   - Out resolution: groundouts, flyouts, lineouts → outs, errors, double plays
+ *   - Base running: runner advancement on hits/walks, stolen bases (incl. home)
+ *   - Pitching: fatigue tracking, bullpen management, pitcher substitution
+ *   - Game flow: half-inning transitions, extra innings, walk-off detection
+ *   - Box scores: per-batter stats (AB, H, R, RBI, etc.) and pitcher stats (IP, K, BB, etc.)
+ *   - Scorecard: per-PA records for the detailed scorecard view
  */
 
 import * as mlbApi from './mlbApi.js'
 import { cpuDecidesSwing, cpuPicksPitch, determineOutcome } from './probabilities.js'
 import { WEATHER_CONDITIONS, TIME_OF_DAY, getErrorChance } from './weather.js'
 
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+/** Standard MLB game length. Extra innings are handled automatically. */
 const TOTAL_INNINGS = 9
+
+/** Outcome categories — used to branch logic in _applyOutcome(). */
 const HIT_TYPES = new Set(['single', 'double', 'triple', 'homerun'])
 const OUT_TYPES = new Set(['groundout', 'flyout', 'lineout'])
-const DOUBLE_PLAY_RATE = 0.55  // ~50-60% GIDP rate when DP is in order
 
+/**
+ * Double play probability when the situation is "in order" (runner on 1st, <2 outs,
+ * groundout outcome). MLB GIDP rate in these situations is roughly 50-60%.
+ */
+const DOUBLE_PLAY_RATE = 0.55
+
+// ============================================================
+// STATE INITIALIZATION
+// ============================================================
+
+/**
+ * Create a blank game state object with all fields initialized to defaults.
+ * This is the single source of truth for every piece of game data.
+ *
+ * The state object is a plain JS object (not reactive) — Vue reactivity is
+ * added in InteractiveGame.vue by wrapping it in a ref and spreading on updates.
+ */
 function _emptyState() {
   return {
+    // --- Game identity ---
     game_id: '',
-    inning: 1,
-    is_top: true,
-    outs: 0,
-    balls: 0,
-    strikes: 0,
-    bases: [false, false, false],
-    runner_indices: [null, null, null],  // batter index of runner on each base
-    away_score: Array(TOTAL_INNINGS).fill(0),
+
+    // --- Inning / half-inning tracking ---
+    inning: 1,              // current inning number (1-indexed)
+    is_top: true,            // true = top of inning (away bats), false = bottom (home bats)
+
+    // --- Count & outs ---
+    outs: 0,                 // outs in the current half-inning (0-2; 3 triggers transition)
+    balls: 0,                // balls in the current at-bat (0-3; 4 triggers walk)
+    strikes: 0,              // strikes in the current at-bat (0-2; 3 triggers strikeout)
+
+    // --- Base runners ---
+    bases: [false, false, false],          // [1st, 2nd, 3rd] — true if occupied
+    runner_indices: [null, null, null],     // lineup index of the runner on each base (for box score credit)
+
+    // --- Scoreboard ---
+    away_score: Array(TOTAL_INNINGS).fill(0),  // runs per inning (array grows for extras)
     home_score: Array(TOTAL_INNINGS).fill(0),
     away_total: 0,
     home_total: 0,
@@ -30,38 +81,68 @@ function _emptyState() {
     home_hits: 0,
     away_errors: 0,
     home_errors: 0,
-    player_role: 'pitching',
-    game_status: 'active',
-    play_log: [],
-    last_play: '',
-    away_team: null,
+
+    // --- Game flow ---
+    player_role: 'pitching',   // 'pitching' (top of inning) or 'batting' (bottom)
+    game_status: 'active',     // 'active' or 'final'
+
+    // --- Play-by-play log ---
+    play_log: [],              // array of human-readable play descriptions
+    last_play: '',             // most recent play (displayed prominently in the UI)
+
+    // --- Teams ---
+    away_team: null,           // full team name (e.g., "New York Yankees")
     home_team: null,
-    away_abbreviation: null,
+    away_abbreviation: null,   // 3-letter abbreviation (e.g., "NYY")
     home_abbreviation: null,
-    away_lineup: null,
+
+    // --- Lineups & batting order ---
+    away_lineup: null,         // array of 9 batter objects with stats
     home_lineup: null,
-    away_batter_idx: 0,
+    away_batter_idx: 0,        // current position in the batting order (0-8, wraps)
     home_batter_idx: 0,
-    current_batter_index: 0,
-    current_batter_name: '',
-    home_pitcher: null,
+    current_batter_index: 0,   // lineup index of the batter currently at the plate
+    current_batter_name: '',   // display name of the current batter
+
+    // --- Pitchers ---
+    home_pitcher: null,        // current pitcher object (with stats, splits, etc.)
     away_pitcher: null,
-    away_box_score: [],
+
+    // --- Box scores (per-batter stats for the game) ---
+    away_box_score: [],        // [{id, name, pos, ab, r, h, 2b, 3b, hr, rbi, bb, so, sb}, ...]
     home_box_score: [],
-    away_pitcher_stats: null,
+
+    // --- Pitcher stats (for the game) ---
+    away_pitcher_stats: null,  // {id, name, ip_outs, h, r, er, bb, so}
     home_pitcher_stats: null,
-    weather: null,
-    time_of_day: null,
-    home_pitch_count: 0,
+
+    // --- Weather & time of day (FREE: weather selection, PREMIUM: time of day) ---
+    weather: null,             // weather key (e.g., 'clear', 'rain') — affects hit/error probabilities
+    time_of_day: null,         // time of day key (e.g., 'day', 'night') — PREMIUM feature in UI, but engine processes it for all games
+
+    // --- Pitch counts & bullpen ---
+    home_pitch_count: 0,       // pitches thrown by the home team's current pitcher
     away_pitch_count: 0,
-    home_bullpen: [],
+    home_bullpen: [],          // array of reliever objects available to bring in
     away_bullpen: [],
-    home_scorecard: [],
+
+    // --- Per-PA scorecard (for detailed scorecard view) ---
+    home_scorecard: [],        // [{inning, batterName, batterIdx, result, rbi, runs, pitchCount}, ...]
     away_scorecard: [],
-    classic_relievers: null,
+
+    // --- Classic game mode ---
+    classic_relievers: null,   // {home: 'Rivera', away: 'Nen'} — named relievers for classic matchups
   }
 }
 
+// ============================================================
+// INTERNAL HELPERS — Batting order, box scores, formatting
+// ============================================================
+
+/**
+ * Look up the current batter from the active lineup and update state
+ * with their name and index. Called after every batter change.
+ */
 function _getCurrentBatter(state) {
   const lineup = state.is_top ? state.away_lineup : state.home_lineup
   const idx = state.is_top ? (state.away_batter_idx || 0) : (state.home_batter_idx || 0)
@@ -72,6 +153,7 @@ function _getCurrentBatter(state) {
   return batter
 }
 
+/** Move to the next batter in the batting order (wraps around after #9). */
 function _advanceBatter(state) {
   if (state.is_top) {
     const lineup = state.away_lineup
@@ -82,6 +164,7 @@ function _advanceBatter(state) {
   }
 }
 
+/** Get the box score entry for the current batter (for stat tracking). */
 function _getBatterBox(state) {
   const box = state.is_top ? state.away_box_score : state.home_box_score
   const idx = state.is_top ? (state.away_batter_idx || 0) : (state.home_batter_idx || 0)
@@ -89,14 +172,26 @@ function _getBatterBox(state) {
   return box[idx % box.length]
 }
 
+/** Get the pitcher stats entry for the current pitcher (for stat tracking). */
 function _getPitcherBox(state) {
   return state.is_top ? state.home_pitcher_stats : state.away_pitcher_stats
 }
 
+/** Convert an outcome key like 'strike_swinging' to display text 'Strike Swinging'. */
 function _formatOutcome(outcome) {
   return outcome.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// ============================================================
+// RUNNER ADVANCEMENT — Walk and hit logic
+// ============================================================
+
+/**
+ * Advance all base runners on a walk (base on balls).
+ * Runners only move if forced — i.e., all bases behind them are occupied.
+ * If bases are loaded, the runner on 3rd scores.
+ * Returns the number of runs scored.
+ */
 function _advanceRunnersWalk(state) {
   const bases = state.bases
   const ri = state.runner_indices
@@ -111,6 +206,15 @@ function _advanceRunnersWalk(state) {
   return runs
 }
 
+/**
+ * Advance all base runners on a hit (single, double, triple, home run).
+ * Each hit type has different advancement rules:
+ *   - Single: runners advance 1 base; runner on 3rd scores
+ *   - Double: runners on 2nd/3rd score; runner on 1st goes to 3rd
+ *   - Triple: all runners score; batter ends up on 3rd
+ *   - Home run: everyone scores, including the batter
+ * Returns the number of runs scored.
+ */
 function _advanceRunnersHit(state, hitType) {
   const bases = state.bases
   const ri = state.runner_indices
@@ -159,6 +263,14 @@ function _scoreRunner(state, runnerIdx) {
   if (box && box[runnerIdx]) box[runnerIdx].r += 1
 }
 
+// ============================================================
+// SCORING & COUNT MANAGEMENT
+// ============================================================
+
+/**
+ * Add runs to the scoreboard for the team currently at bat.
+ * Updates both the per-inning array and the running total.
+ */
 function _scoreRuns(state, runs) {
   if (runs <= 0) return
   const inningIdx = state.inning - 1
@@ -171,11 +283,17 @@ function _scoreRuns(state, runs) {
   }
 }
 
+/** Reset the ball/strike count to 0-0 (after a PA completes). */
 function _resetCount(state) {
   state.balls = 0
   state.strikes = 0
 }
 
+// ============================================================
+// GAME FLOW — End of game, end of half-inning
+// ============================================================
+
+/** Mark the game as final and log the final score message. */
 function _endGame(state) {
   state.game_status = 'final'
   const homeName = state.home_team || 'Home'
@@ -186,6 +304,11 @@ function _endGame(state) {
   state.last_play = msg
 }
 
+/**
+ * End the current half-inning: reset outs, clear bases, swap sides.
+ * Handles walk-off detection (home team ahead after top of 9+) and
+ * extra-inning creation (tie game after regulation).
+ */
 function _endHalfInning(state) {
   state.outs = 0
   state.bases = [false, false, false]
@@ -224,6 +347,11 @@ function _endHalfInning(state) {
   }
 }
 
+// ============================================================
+// SCORECARD — Per-PA records for the detailed scorecard view
+// ============================================================
+
+/** Push a plate appearance result onto the scorecard for the batting team. */
 function _pushScorecardPA(state, result, rbi) {
   const sc = state.is_top ? state.away_scorecard : state.home_scorecard
   const idx = state.is_top ? (state.away_batter_idx || 0) : (state.home_batter_idx || 0)
@@ -239,6 +367,11 @@ function _pushScorecardPA(state, result, rbi) {
   })
 }
 
+// ============================================================
+// PLATE APPEARANCE RESOLUTION — Walks, outs, hits, double plays
+// ============================================================
+
+/** Process a base on balls (walk). Advances forced runners, credits BB stats. */
 function _walk(state) {
   const batterBox = _getBatterBox(state)
   const pitcherBox = _getPitcherBox(state)
@@ -257,6 +390,11 @@ function _walk(state) {
   _getCurrentBatter(state)
 }
 
+/**
+ * Record a single out (strikeout, groundout, flyout, lineout).
+ * Increments outs, resets the count, advances the batting order,
+ * and triggers end-of-half-inning if this was the 3rd out.
+ */
 function _recordOut(state, description, outType) {
   if (outType) _pushScorecardPA(state, outType, 0)
   state.play_log.push(description)
@@ -271,6 +409,11 @@ function _recordOut(state, description, outType) {
   }
 }
 
+/**
+ * Record a hit (single, double, triple, home run).
+ * Advances runners, credits RBIs and extra-base hits, scores runs,
+ * and moves to the next batter.
+ */
 function _recordHit(state, hitType) {
   const batterBox = _getBatterBox(state)
   const pitcherBox = _getPitcherBox(state)
@@ -293,22 +436,35 @@ function _recordHit(state, hitType) {
   }
 }
 
+/**
+ * Process a ground-into double play (GIDP).
+ * Standard 6-4-3 / 4-6-3: lead runner forced at 2nd, batter thrown out at 1st.
+ *
+ * Conditions (checked in _applyOutcome before calling this):
+ *   - Outcome must be 'groundout'
+ *   - Runner must be on 1st base
+ *   - Less than 2 outs (so 2 more outs won't exceed 3 total... well, it can make exactly 3)
+ *
+ * Runner advancement on DP:
+ *   - Runner on 1st: removed (forced out at 2nd)
+ *   - Runner on 2nd: advances to 3rd (not forced, moves up)
+ *   - Runner on 3rd: scores (not forced, moves up)
+ *   - Batter: out at 1st (does not reach base)
+ */
 function _applyDoublePlay(state) {
   const batterBox = _getBatterBox(state)
   const pitcherBox = _getPitcherBox(state)
 
-  // Record 2 outs
+  // Two outs recorded on the play
   state.outs += 2
   if (batterBox) batterBox.ab += 1
   if (pitcherBox) pitcherBox.ip_outs += 2
 
-  // Remove runner from 1st (forced at 2nd), batter out at 1st
+  // Lead runner forced at 2nd — remove from 1st; batter thrown out at 1st — doesn't reach
   state.bases[0] = false
   state.runner_indices[0] = null
 
-  // Advance other runners per force-play rules
-  // Runner on 2nd advances to 3rd (not a force — they move up)
-  // Runner on 3rd scores (not a force — they move up)
+  // Non-forced runners advance freely during the double play
   let runs = 0
   if (state.bases[2]) {
     runs += 1
@@ -339,6 +495,17 @@ function _applyDoublePlay(state) {
   }
 }
 
+/**
+ * Central outcome dispatcher — routes every pitch result to the appropriate handler.
+ *
+ * Called by processPitch() (player pitching), processAtBat() (player batting),
+ * and simulateGame() (CPU vs CPU). Handles:
+ *   - Balls → walk after 4
+ *   - Strikes → strikeout after 3
+ *   - Fouls → increment strike (max 2)
+ *   - Outs (groundout/flyout/lineout) → error check → double play check → normal out
+ *   - Hits (single/double/triple/homerun) → runner advancement and scoring
+ */
 function _applyOutcome(state, outcome, msg) {
   if (state.is_top) state.home_pitch_count += 1
   else state.away_pitch_count += 1
@@ -399,6 +566,15 @@ function _applyOutcome(state, outcome, msg) {
   }
 }
 
+// ============================================================
+// SNAPSHOT — Deep-copy state for simulation replay
+// ============================================================
+
+/**
+ * Create a deep copy of the game state for simulation replay.
+ * Each snapshot captures the state after one play, allowing the UI
+ * to step through the game play-by-play in the simulation viewer.
+ */
 function _snapshot(state) {
   return {
     inning: state.inning,
@@ -476,6 +652,16 @@ export function switchPitcher(state, side, newPitcher) {
 /**
  * Initialize a new game with teams, lineups, and pitchers.
  * All MLB data is fetched via mlbApi.js.
+ *
+ * This function is called from the UI after the player completes the setup wizard.
+ * It accepts whatever teams/seasons/pitchers the UI provides — the engine itself
+ * has no concept of free vs premium. Premium gating (season ranges, opponent
+ * season selection, time-of-day picker) is enforced in InteractiveGame.vue BEFORE
+ * this function is called.
+ *
+ * The `timeOfDay` parameter affects error chance probabilities via weather.js.
+ * It is only set when a premium user selects a time of day in the UI;
+ * free users get `null` (which defaults to a baseline 2% error chance).
  */
 export async function createNewGame({
   homeTeamId = null,
@@ -620,7 +806,8 @@ export function processPitch(state, pitchType) {
   const pitcherStats = pitcher?.activeStats || pitcher?.stats || null
 
   const swings = cpuDecidesSwing()
-  const outcome = determineOutcome(pitchType, swings, playerStats, pitcherStats, state.weather, state.home_pitch_count, state.time_of_day)
+  let outcome = determineOutcome(pitchType, swings, playerStats, pitcherStats, state.weather, state.home_pitch_count, state.time_of_day)
+  if (state._outcomeFilter) outcome = state._outcomeFilter(state, outcome)
   const actionStr = swings ? 'swings' : 'takes'
   const msg = `You throw a ${pitchType}. ${batterName} ${actionStr}: ${_formatOutcome(outcome)}!`
   _applyOutcome(state, outcome, msg)
@@ -660,15 +847,37 @@ export function processAtBat(state, action) {
   return state
 }
 
-// MLB steal success rate ~75%, attempt rate ~0.06 per plate appearance
+// ============================================================
+// STOLEN BASES — Manual (interactive) and automatic (simulation)
+// ============================================================
+
+/** MLB pickoff success rate when attempted is ~10-20%. */
+const PICKOFF_SUCCESS_RATE = 0.15
+
+/** MLB average stolen base success rate is ~75%. */
 const STEAL_SUCCESS_RATE = 0.75
-const STEAL_HOME_SUCCESS_RATE = 0.30  // stealing home is very rare and risky
-const SIM_STEAL_ATTEMPT_RATE = 0.06  // ~1.1 attempts per team per game
-const SIM_STEAL_HOME_ATTEMPT_RATE = 0.005  // extremely rare in sim
 
 /**
- * Attempt a stolen base. baseIdx: 0 = steal 2nd, 1 = steal 3rd.
- * Returns the state after the attempt.
+ * Stealing home is extremely risky — MLB success rate when attempted is ~30-40%.
+ * Players very rarely attempt it (maybe a few times per season league-wide).
+ */
+const STEAL_HOME_SUCCESS_RATE = 0.30
+
+/** Probability the CPU attempts a steal per plate appearance in sim mode (~1.1 per team per game). */
+const SIM_STEAL_ATTEMPT_RATE = 0.06
+
+/** Probability the CPU attempts to steal home in sim mode (extremely rare). */
+const SIM_STEAL_HOME_ATTEMPT_RATE = 0.005
+
+/**
+ * Attempt a stolen base.
+ *   baseIdx = 0 → runner on 1st steals 2nd
+ *   baseIdx = 1 → runner on 2nd steals 3rd
+ *   baseIdx = 2 → runner on 3rd steals home (scores a run on success)
+ *
+ * On success: runner advances (or scores), SB stat credited.
+ * On failure: runner is out (caught stealing), base cleared.
+ * Returns the updated state.
  */
 export function attemptSteal(state, baseIdx) {
   if (!state || state.game_status !== 'active') return state || {}
@@ -742,11 +951,61 @@ export function attemptSteal(state, baseIdx) {
 }
 
 /**
- * In simulation, maybe attempt a steal if runners are on base.
- * Called once per plate appearance during simulated games.
+ * Attempt a pickoff throw to a base (player-pitcher only).
+ *   baseIdx = 0 → throw to 1st
+ *   baseIdx = 1 → throw to 2nd
+ *   baseIdx = 2 → throw to 3rd
+ *
+ * On success: runner is out, base cleared.
+ * On failure: runner is safe, no state change except log + pitch count.
+ * Returns the updated state.
+ */
+export function attemptPickoff(state, baseIdx) {
+  if (!state || state.game_status !== 'active') return state || {}
+  if (state.player_role !== 'pitching') {
+    state.last_play = "You can only attempt a pickoff while pitching!"
+    return state
+  }
+  if (!state.bases[baseIdx]) {
+    const baseLabel = baseIdx === 0 ? '1st' : baseIdx === 1 ? '2nd' : '3rd'
+    state.last_play = `Can't throw to ${baseLabel} — no runner!`
+    return state
+  }
+
+  const box = state.is_top ? state.away_box_score : state.home_box_score
+  const runnerIdx = state.runner_indices[baseIdx]
+  const runnerName = (box && runnerIdx != null) ? box[runnerIdx]?.name || 'Runner' : 'Runner'
+  const baseLabel = baseIdx === 0 ? '1st' : baseIdx === 1 ? '2nd' : '3rd'
+
+  if (Math.random() < PICKOFF_SUCCESS_RATE) {
+    // Picked off
+    state.bases[baseIdx] = false
+    state.runner_indices[baseIdx] = null
+    state.outs += 1
+    const msg = `Picked off ${runnerName} at ${baseLabel}!`
+    state.play_log.push(msg)
+    state.last_play = msg
+    if (state.outs >= 3) {
+      _endHalfInning(state)
+    }
+  } else {
+    // Safe
+    const msg = `Throw to ${baseLabel} — ${runnerName} is safe!`
+    state.play_log.push(msg)
+    state.last_play = msg
+    // Costs a throw — increment pitch count
+    if (state.is_top) state.home_pitch_count += 1
+    else state.away_pitch_count += 1
+  }
+  return state
+}
+
+/**
+ * In simulation mode, roll the dice to see if the CPU attempts a steal.
+ * Called once per plate appearance. Priority: steal home (very rare) > steal 2nd > steal 3rd.
  */
 function _maybeSimSteal(state) {
-  // Steal home: extremely rare
+  // Steal home: extremely rare (~0.5% chance per PA with runner on 3rd)
   if (state.bases[2] && Math.random() < SIM_STEAL_HOME_ATTEMPT_RATE) {
     attemptSteal(state, 2)
     return
@@ -760,8 +1019,13 @@ function _maybeSimSteal(state) {
   }
 }
 
+// ============================================================
+// PITCHING CHANGES — Fatigue and classic-mode reliever logic
+// ============================================================
+
 /**
  * Find a reliever from the bullpen by name (case-insensitive partial match).
+ * Used for classic matchups where specific relievers are designated (e.g., Rivera).
  * Returns the index in the bullpen array, or -1 if not found.
  */
 function _findRelieverIdx(bullpen, name) {
@@ -808,7 +1072,16 @@ function _maybeSwapPitcher(state, side) {
   }
 }
 
-/** Simulate an entire game (CPU vs CPU) and return snapshots at each play. */
+// ============================================================
+// SIMULATION — CPU vs CPU full-game simulation
+// ============================================================
+
+/**
+ * Simulate an entire game (CPU vs CPU) from the current state to completion.
+ * Returns {state, snapshots} where snapshots is an array of state copies,
+ * one per play, used by the UI to replay the game with animation.
+ * Capped at 500 iterations as a safety valve against infinite loops.
+ */
 export function simulateGame(state) {
   if (!state || state.game_status !== 'active') return { state: state || {}, snapshots: [] }
 
@@ -837,6 +1110,7 @@ export function simulateGame(state) {
       let outcome
       if (state._forceNextOutcome) { outcome = state._forceNextOutcome; state._forceNextOutcome = null }
       else { outcome = determineOutcome(pitchType, swings, playerStats, pitcherStats, state.weather, state.home_pitch_count, state.time_of_day) }
+      if (state._outcomeFilter) outcome = state._outcomeFilter(state, outcome)
       const actionStr = swings ? 'swings' : 'takes'
       const msg = `You throw a ${pitchType}. ${batterName} ${actionStr}: ${_formatOutcome(outcome)}!`
       _applyOutcome(state, outcome, msg)

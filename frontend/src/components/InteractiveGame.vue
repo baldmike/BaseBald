@@ -8,8 +8,28 @@
 
     The `setupStep` ref drives which step is shown. Once a game is created
     (game ref is non-null), the setup wizard hides and the game UI appears.
+
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║                  FREE vs PREMIUM FEATURES                       ║
+    ╠══════════════════════════════════════════════════════════════════╣
+    ║  FEATURE                    │  FREE           │  PREMIUM        ║
+    ║  ─────────────────────────  │  ──────────     │  ──────────     ║
+    ║  Season range               │  2000-2025      │  1920-2025      ║
+    ║  Historic matchups          │  6 games        │  15 games       ║
+    ║  Fantasy matchups           │  6 games        │  15 games       ║
+    ║  Opponent season selection  │  Locked to home │  Any season     ║
+    ║  Time of day picker         │  Hidden         │  Visible        ║
+    ║  ─────────────────────────  │  ──────────     │  ──────────     ║
+    ║  ALL in-game mechanics      │  Full access    │  Full access    ║
+    ║  (pitching, batting, steals,│                 │                 ║
+    ║   double plays, bullpen,    │                 │                 ║
+    ║   weather effects, etc.)    │                 │                 ║
+    ╚══════════════════════════════════════════════════════════════════╝
+
+    Premium is unlocked via a code entered in any of the upgrade CTA sections.
+    The unlock state is persisted in localStorage('premiumUnlocked').
   -->
-  <div class="interactive-game">
+  <div class="interactive-game" :class="{ 'ellis-melting': ellisMelting, 'ellis-fade-in': ellisFadeIn }">
     <!--
       ==================== STEP 1: PICK SEASON + TEAM ====================
       The landing screen with three paths forward:
@@ -52,6 +72,7 @@
           <span v-if="loadingHomeTeams" class="season-hero-loading">Loading teams...</span>
         </div>
         <TeamSelector :teams="homeTeams" @teamSelected="onTeamSelected" />
+        <!-- PREMIUM GATE: Season range upgrade CTA (free users see 2000-2025, premium see 1920-2025) -->
         <div v-if="!premiumUnlocked" class="unlock-section">
           <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
             Upgrade to Premium to go back to 1920! — Just $3!
@@ -97,6 +118,7 @@
               <div class="matchup-decision"><span class="decision-w">W: {{ m.winningPitcher }}</span> · <span class="decision-l">L: {{ m.losingPitcher }}</span></div>
             </button>
           </div>
+          <!-- PREMIUM GATE: Historic matchups upgrade CTA (free: 6 games, premium: 15 games) -->
           <div v-if="!premiumUnlocked" class="unlock-section">
             <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
               Unlock 9 more Historic and 9 more Fantasy Games — Only $3!
@@ -139,6 +161,7 @@
               <div class="matchup-pitchers">{{ m.away.pitcherName }} vs {{ m.home.pitcherName }}</div>
             </button>
           </div>
+          <!-- PREMIUM GATE: Fantasy matchups upgrade CTA (free: 6 games, premium: 15 games) -->
           <div v-if="!premiumUnlocked" class="unlock-section">
             <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
               Unlock 9 more Historic and 9 more Fantasy Games — Only $3!
@@ -202,11 +225,15 @@
       <div class="step-header">
         <h3 class="step-label">Now pick the opponent</h3>
       </div>
+      <!-- PREMIUM GATE: Opponent season dropdown — premium users can pick any season,
+           free users are locked to the same season as their home team -->
       <div class="season-select pregame-season" style="margin-bottom: 16px; text-align: center;">
         <label for="away-season" style="color: #aaa; font-size: 14px; margin-right: 8px;">Season:</label>
+        <!-- PREMIUM: full season dropdown for opponent -->
         <select v-if="premiumUnlocked" id="away-season" v-model="selectedAwaySeason" class="season-dropdown">
           <option v-for="year in availableSeasons" :key="year" :value="year">{{ year }}</option>
         </select>
+        <!-- FREE: locked to home team's season (display only) -->
         <span v-else style="color: #ccc; font-size: 15px;">{{ selectedSeason }}</span>
         <span v-if="loadingAwayTeams" style="color: #888; margin-left: 12px; font-size: 13px;">Loading teams...</span>
       </div>
@@ -230,6 +257,7 @@
       </div>
       <button class="play-btn" @click="goToStep(4)" :disabled="!selectedOpponentId" style="margin-top: 20px">Next</button>
 
+      <!-- PREMIUM GATE: Cross-season opponent selection upgrade CTA -->
       <div v-if="!premiumUnlocked" class="unlock-section">
         <a href="https://baldmike.gumroad.com/l/basebald" target="_blank" rel="noopener" class="unlock-btn">
           Upgrade to Premium to unlock the ability to choose opponents from ANY season — just $3!
@@ -340,18 +368,18 @@
         </div>
       </div>
 
-      <div class="weather-selection">
+      <div class="weather-selection" :class="{ 'ellis-weather': isDockEllis }">
         <p>Choose the conditions:</p>
         <div class="weather-grid">
           <button
             v-for="key in weatherKeys.slice(0, 4)"
             :key="key"
             class="weather-card"
-            :class="{ selected: selectedWeather === key }"
+            :class="{ selected: selectedWeather === key, 'ellis-ripple': isDockEllis && selectedWeather !== key }"
             @click="selectedWeather = key"
           >
-            <span class="weather-icon">{{ WEATHER_CONDITIONS[key].icon }}</span>
-            <span class="weather-label">{{ WEATHER_CONDITIONS[key].label }}</span>
+            <span class="weather-icon">{{ isDockEllis ? ellisWeatherIcon(key) : WEATHER_CONDITIONS[key].icon }}</span>
+            <span class="weather-label">{{ isDockEllis ? ellisWeatherLabel[key] : WEATHER_CONDITIONS[key].label }}</span>
             <span class="weather-detail">{{ WEATHER_CONDITIONS[key].temp }} · {{ WEATHER_CONDITIONS[key].wind }}</span>
           </button>
         </div>
@@ -360,38 +388,53 @@
             v-for="key in weatherKeys.slice(4)"
             :key="key"
             class="weather-card"
-            :class="{ selected: selectedWeather === key }"
+            :class="{ selected: selectedWeather === key, 'ellis-ripple': isDockEllis && selectedWeather !== key }"
             @click="selectedWeather = key"
           >
-            <span class="weather-icon">{{ WEATHER_CONDITIONS[key].icon }}</span>
-            <span class="weather-label">{{ WEATHER_CONDITIONS[key].label }}</span>
+            <span class="weather-icon">{{ isDockEllis ? ellisWeatherIcon(key) : WEATHER_CONDITIONS[key].icon }}</span>
+            <span class="weather-label">{{ isDockEllis ? ellisWeatherLabel[key] : WEATHER_CONDITIONS[key].label }}</span>
             <span class="weather-detail">{{ WEATHER_CONDITIONS[key].temp }} · {{ WEATHER_CONDITIONS[key].wind }}</span>
           </button>
         </div>
       </div>
 
-      <div v-if="premiumUnlocked" class="weather-selection">
+      <!-- PREMIUM GATE: Time of day selection — only visible to premium users.
+           Affects error chance probabilities (day=4%, twilight=6%, night=2%).
+           Free users get no time-of-day (null → baseline 2% error chance). -->
+      <div v-if="premiumUnlocked" class="weather-selection" :class="{ 'ellis-weather': isDockEllis }">
         <p>Time of day:</p>
         <div class="weather-grid tod-grid">
           <button
             v-for="key in timeOfDayKeys"
             :key="key"
             class="weather-card"
-            :class="{ selected: selectedTimeOfDay === key }"
-            @click="selectedTimeOfDay = key"
+            :class="{ selected: selectedTimeOfDay === key, 'ellis-ripple': isDockEllis && selectedTimeOfDay !== key, 'ellis-disabled': isDockEllis && (key === 'day' || key === 'night') }"
+            @click="!(isDockEllis && (key === 'day' || key === 'night')) && (selectedTimeOfDay = key)"
           >
-            <span class="weather-icon">{{ TIME_OF_DAY[key].icon }}</span>
-            <span class="weather-label">{{ TIME_OF_DAY[key].label }}</span>
+            <span class="weather-icon">{{ isDockEllis ? ellisTodIcon(key) : TIME_OF_DAY[key].icon }}</span>
+            <span class="weather-label">{{ isDockEllis ? ellisTodLabel[key] : TIME_OF_DAY[key].label }}</span>
           </button>
         </div>
       </div>
 
       <div class="start-actions">
-        <button class="play-btn" @click="startGame()" :disabled="loading">
-          {{ loading ? 'Loading rosters...' : 'Play Ball!' }}
+        <button class="play-btn" @click="startGame()" :disabled="loading"
+          @mouseenter="isDockEllis && startScramble('playBall')" @mouseleave="isDockEllis && stopScramble('playBall')">
+          <span v-if="loading">Loading rosters...</span>
+          <span v-else-if="isDockEllis" class="scramble-text">
+            <span v-for="(ch, i) in scrambleLetters.playBall" :key="i"
+              class="scramble-letter" :class="[ch.effect, { 'letter-hidden': !ch.visible }]">{{ ch.char }}</span>
+          </span>
+          <span v-else>Play Ball!</span>
         </button>
-        <button class="play-btn simulate-btn" @click="startSimulation()" :disabled="loading">
-          {{ loading ? 'Loading...' : 'Simulate' }}
+        <button class="play-btn simulate-btn" @click="startSimulation()" :disabled="loading"
+          @mouseenter="isDockEllis && startScramble('simulate')" @mouseleave="isDockEllis && stopScramble('simulate')">
+          <span v-if="loading">Loading...</span>
+          <span v-else-if="isDockEllis" class="scramble-text">
+            <span v-for="(ch, i) in scrambleLetters.simulate" :key="i"
+              class="scramble-letter" :class="[ch.effect, { 'letter-hidden': !ch.visible }]">{{ ch.char }}</span>
+          </span>
+          <span v-else>Simulate</span>
         </button>
       </div>
     </div>
@@ -644,6 +687,17 @@
               <button class="bullpen-cancel" @click="showBullpen = false">Cancel</button>
             </div>
           </div>
+          <div v-if="canPickoff" class="button-group pickoff-group">
+            <button v-if="game.bases[0]" class="action-btn pickoff-btn" @click="doPickoff(0)" :disabled="loading">
+              Throw to 1st
+            </button>
+            <button v-if="game.bases[1]" class="action-btn pickoff-btn" @click="doPickoff(1)" :disabled="loading">
+              Throw to 2nd
+            </button>
+            <button v-if="game.bases[2]" class="action-btn pickoff-btn" @click="doPickoff(2)" :disabled="loading">
+              Throw to 3rd
+            </button>
+          </div>
         </div>
 
         <!--
@@ -852,7 +906,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { createNewGame, simulateGame, processPitch, processAtBat, switchPitcher, attemptSteal } from '../services/gameEngine.js'
+import { createNewGame, simulateGame, processPitch, processAtBat, switchPitcher, attemptSteal, attemptPickoff } from '../services/gameEngine.js'
 import { getAllTeams, getTeamPitchers, getTeamVenue } from '../services/mlbApi.js'
 import { WEATHER_CONDITIONS, TIME_OF_DAY } from '../services/weather.js'
 import { useSoundEffects } from '../composables/useSoundEffects.js'
@@ -885,10 +939,34 @@ const gameMode = ref(null)
 // ============================================================
 // PREMIUM UNLOCK
 // ============================================================
+//
+// Premium is a one-time unlock gated by a code (sold via Gumroad for $3).
+// The unlock state is persisted in localStorage so it survives page reloads.
+//
+// What premium unlocks (all enforced in THIS file, not in gameEngine.js):
+//   1. Season range:     2000-2025 (free) → 1920-2025 (premium)
+//   2. Historic matchups: 6 (free) → 15 (premium)
+//   3. Fantasy matchups:  6 (free) → 15 (premium)
+//   4. Opponent season:   locked to home season (free) → any season (premium)
+//   5. Time of day:       hidden (free) → day/twilight/night picker (premium)
+//
+// All in-game mechanics (pitching, batting, steals, double plays, weather
+// effects, bullpen management, etc.) are fully available to ALL users.
+// ============================================================
+
+/** Whether the user has unlocked premium features (persisted in localStorage). */
 const premiumUnlocked = ref(localStorage.getItem('premiumUnlocked') === 'true')
+
+/** Two-way bound to the unlock code input field. */
 const unlockCode = ref('')
+
+/** Shows an error message when the user enters an incorrect code. */
 const unlockError = ref(false)
 
+/**
+ * Validate the unlock code and activate premium if correct.
+ * Called when the user clicks "Unlock" or presses Enter in the code input.
+ */
 function tryUnlock() {
   if (unlockCode.value === 'BASEBALD-PREMIUM-8675309') {
     premiumUnlocked.value = true
@@ -899,12 +977,20 @@ function tryUnlock() {
   }
 }
 
+/**
+ * PREMIUM GATE: Historic matchups list.
+ * Free users see 6 matchups; premium users see all 15.
+ */
 const historicalMatchups = computed(() =>
   premiumUnlocked.value
     ? [...freeHistoricalMatchups, ...premiumHistoricalMatchups]
     : freeHistoricalMatchups
 )
 
+/**
+ * PREMIUM GATE: Fantasy matchups list.
+ * Free users see 6 matchups; premium users see all 15.
+ */
 const fantasyMatchups = computed(() =>
   premiumUnlocked.value
     ? [...freeFantasyMatchups, ...premiumFantasyMatchups]
@@ -939,10 +1025,10 @@ const teamSelected = ref(null)
 const selectedSeason = ref(2025)
 
 /**
- * Array of all available season years for the dropdown.
- * Generated as [2025, 2024, 2023, ..., 1921, 1920] — descending so the
- * most recent (and most complete data) seasons appear first.
- * Spans from 1920 (start of the "live ball era") to 2025.
+ * PREMIUM GATE: Available season years for the season dropdown.
+ * Generated descending so the most recent seasons appear first.
+ *   - Free: 2000-2025 (26 seasons)
+ *   - Premium: 1920-2025 (106 seasons — back to the live ball era)
  */
 const availableSeasons = computed(() => {
   const earliest = premiumUnlocked.value ? 1920 : 2000
@@ -1038,6 +1124,119 @@ const classicMatchupData = ref(null)
  */
 const selectedWeather = ref('clear')
 const selectedTimeOfDay = ref(null)
+
+/** Dock Ellis LSD no-hitter — special theming on the weather/time-of-day screen. */
+const isDockEllis = computed(() => classicLabel.value === 'Dock Ellis: Just Say No-No')
+const ellisWeatherLabel = { clear: 'Trippy Skies', hot: 'Hot & Humid', wind_out: 'Wind Out', wind_in: 'Wind In', cold: 'Lucy', rain: 'Sky', dome: 'Diamonds' }
+const ellisTodLabel = { day: 'Day Game', twilight: 'Twilight Zone', night: 'Night Game' }
+
+// Icons that cycle through tiles — Dock Ellis, Jimi Hendrix (whom he thought was there), and trippy symbols
+const ellisIconPool = ['🌈', '🎸', '⚾', '💎', '🌌', '💠', '🔥', '💨', '🌬️', '👁️', '🍄', '✌️', '🎵', '💀', '🌀']
+const ellisShuffledIcons = ref([...ellisIconPool.slice(0, 7)])
+const ellisTodIcons = ref(['☀️', '👁️', '🌙'])
+let ellisInterval = null
+
+function shuffleEllisIcons() {
+  const pool = [...ellisIconPool]
+  // Fisher-Yates shuffle
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  ellisShuffledIcons.value = pool.slice(0, 7)
+  ellisTodIcons.value = pool.slice(7, 10)
+}
+
+watch(isDockEllis, (val) => {
+  if (val) {
+    shuffleEllisIcons()
+    ellisInterval = setInterval(shuffleEllisIcons, 5000)
+  } else {
+    if (ellisInterval) { clearInterval(ellisInterval); ellisInterval = null }
+  }
+})
+
+function ellisWeatherIcon(key) {
+  const idx = weatherKeys.indexOf(key)
+  return ellisShuffledIcons.value[idx] || '🌈'
+}
+function ellisTodIcon(key) {
+  const idx = timeOfDayKeys.indexOf(key)
+  return ellisTodIcons.value[idx] || '👁️'
+}
+
+/** Letter melt/fall effect on hover for Play Ball! / Simulate buttons (Dock Ellis only).
+ *  On hover: letters randomly melt or fall away until gone.
+ *  On leave: letters slowly reappear in random order. */
+const scrambleOriginals = { playBall: 'Play Ball!', simulate: 'Simulate' }
+const scrambleIntervals = {}
+
+function makeLetters(str) {
+  return str.split('').map(ch => ({ char: ch, effect: '', visible: true }))
+}
+
+const scrambleLetters = ref({
+  playBall: makeLetters('Play Ball!'),
+  simulate: makeLetters('Simulate'),
+})
+
+function startScramble(key) {
+  if (scrambleIntervals[key]) { clearInterval(scrambleIntervals[key]); delete scrambleIntervals[key] }
+  const original = scrambleOriginals[key]
+  // Build list of non-space indices, shuffled for random disappear order
+  const indices = []
+  for (let i = 0; i < original.length; i++) { if (original[i] !== ' ') indices.push(i) }
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]]
+  }
+  let removed = 0
+  const letters = original.split('').map(ch => ({
+    char: ch === ' ' ? '\u00A0' : ch,
+    effect: '',
+    visible: true,
+  }))
+  scrambleLetters.value = { ...scrambleLetters.value, [key]: [...letters.map(l => ({ ...l }))] }
+  scrambleIntervals[key] = setInterval(() => {
+    if (removed >= indices.length) {
+      clearInterval(scrambleIntervals[key]); delete scrambleIntervals[key]; return
+    }
+    const idx = indices[removed]
+    letters[idx].effect = Math.random() < 0.5 ? 'letter-melt' : 'letter-fall'
+    letters[idx].visible = false
+    removed++
+    scrambleLetters.value = { ...scrambleLetters.value, [key]: [...letters.map(l => ({ ...l }))] }
+  }, 150)
+}
+
+function stopScramble(key) {
+  if (scrambleIntervals[key]) { clearInterval(scrambleIntervals[key]); delete scrambleIntervals[key] }
+  const original = scrambleOriginals[key]
+  const current = scrambleLetters.value[key]
+  // Find which indices are still hidden
+  const hidden = []
+  for (let i = 0; i < current.length; i++) {
+    if (original[i] !== ' ' && !current[i].visible) hidden.push(i)
+  }
+  // Shuffle for random reappear order
+  for (let i = hidden.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [hidden[i], hidden[j]] = [hidden[j], hidden[i]]
+  }
+  if (hidden.length === 0) return
+  let restored = 0
+  const letters = current.map(l => ({ ...l }))
+  scrambleIntervals[key] = setInterval(() => {
+    if (restored >= hidden.length) {
+      clearInterval(scrambleIntervals[key]); delete scrambleIntervals[key]; return
+    }
+    const idx = hidden[restored]
+    letters[idx].visible = true
+    letters[idx].effect = 'letter-rise'
+    restored++
+    scrambleLetters.value = { ...scrambleLetters.value, [key]: [...letters.map(l => ({ ...l }))] }
+  }, 200)
+}
 
 /**
  * Selected venue name displayed below the matchup title during gameplay.
@@ -1187,7 +1386,7 @@ function onToggleSound() {
 const freeHistoricalMatchups = [
   { label: "Babe Ruth's Called Shot", article: 'https://www.nationalgeographic.com/history/article/babe-ruth-called-shot-home-run', subtitle: '1932 World Series, Game 3', date: 'Oct 1, 1932', stadium: 'Wrigley Field', weather: 'cold', winningPitcher: 'George Pipgras', losingPitcher: 'Charlie Root', home: { id: 112, name: 'Cubs', season: 1932, pitcherId: 121440, pitcherName: 'Charlie Root' }, away: { id: 147, name: 'Yankees', season: 1932, pitcherId: 120593, pitcherName: 'George Pipgras' } },
   { label: "Don Larsen's Perfect Game", article: 'https://www.si.com/mlb/2016/10/04/don-larsen-perfect-game-color-photos', subtitle: '1956 World Series, Game 5', date: 'Oct 8, 1956', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Don Larsen', losingPitcher: 'Sal Maglie', home: { id: 147, name: 'Yankees', season: 1956, pitcherId: 117514, pitcherName: 'Don Larsen' }, away: { id: 119, name: 'Dodgers', season: 1956, pitcherId: 118140, pitcherName: 'Sal Maglie' } },
-  { label: "Dock Ellis: Just Say No-No", article: 'https://www.rollingstone.com/culture/culture-sports/how-dock-ellis-player-who-pitched-a-no-hitter-on-lsd-is-misremembered-199528/', subtitle: '1970 Regular Season', date: 'Jun 12, 1970', stadium: 'San Diego Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Dave Roberts', home: { id: 135, name: 'Padres', season: 1970, pitcherId: 121276, pitcherName: 'Dave Roberts' }, away: { id: 134, name: 'Pirates', season: 1970, pitcherId: 113815, pitcherName: 'Dock Ellis' } },
+  { label: "Dock Ellis: Just Say No-No", article: 'https://www.rollingstone.com/culture/culture-sports/how-dock-ellis-player-who-pitched-a-no-hitter-on-lsd-is-misremembered-199528/', subtitle: '1970 Regular Season', date: 'Jun 12, 1970', stadium: 'San Diego Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Dave Roberts', home: { id: 134, name: 'Pirates', season: 1970, pitcherId: 113815, pitcherName: 'Dock Ellis' }, away: { id: 135, name: 'Padres', season: 1970, pitcherId: 121276, pitcherName: 'Dave Roberts' } },
   { label: 'History on September 1st, 1971', article: 'https://andscape.com/features/on-this-day-in-1971-the-pittsburgh-pirates-fielded-the-first-all-black-lineup/', subtitle: '1971 Regular Season, First All-Black Lineup', date: 'Sep 1, 1971', stadium: 'Three Rivers Stadium', weather: 'clear', winningPitcher: 'Dock Ellis', losingPitcher: 'Woodie Fryman', home: { id: 134, name: 'Pirates', season: 1971, pitcherId: 113815, pitcherName: 'Dock Ellis' }, away: { id: 143, name: 'Phillies', season: 1971, pitcherId: 114466, pitcherName: 'Woodie Fryman' } },
   { label: "Hank Aaron's 715th Home Run", article: 'https://www.si.com/mlb/2020/04/08/hank-aaron-home-run-715-passes-babe-ruth', subtitle: '1974 Regular Season', date: 'Apr 8, 1974', stadium: 'Atlanta-Fulton County Stadium', weather: 'clear', winningPitcher: 'Ron Reed', losingPitcher: 'Al Downing', home: { id: 144, name: 'Braves', season: 1974, pitcherId: 121001, pitcherName: 'Ron Reed' }, away: { id: 119, name: 'Dodgers', season: 1974, pitcherId: 113515, pitcherName: 'Al Downing' } },
   { label: "3 HR from Mr. October", article: 'https://sabr.org/gamesproj/game/october-18-1977-reggie-becomes-mr-october-with-3-home-runs-in-world-series/', subtitle: '1977 World Series, Game 6', date: 'Oct 18, 1977', stadium: 'Yankee Stadium', weather: 'clear', winningPitcher: 'Mike Torrez', losingPitcher: 'Burt Hooton', home: { id: 147, name: 'Yankees', season: 1977, pitcherId: 123416, pitcherName: 'Mike Torrez' }, away: { id: 119, name: 'Dodgers', season: 1977, pitcherId: 116131, pitcherName: 'Burt Hooton' } },
@@ -1467,6 +1666,7 @@ async function goToStep(step) {
   }
 
   // When entering step 3, fetch away teams for the default away season
+  // PREMIUM GATE: Free users can't change opponent season — lock it to home team's season
   if (step === 3) {
     if (!premiumUnlocked.value) {
       selectedAwaySeason.value = selectedSeason.value
@@ -1574,10 +1774,50 @@ function goBack() {
  * If called without any team selection (the "Skip" path), createNewGame
  * receives undefined values and the backend assigns random teams.
  */
+/** Dock Ellis screen melt transition state */
+const ellisMelting = ref(false)
+const ellisFadeIn = ref(false)
+
+function _ellistMeltTransition(assignGame) {
+  return new Promise(resolve => {
+    if (!isDockEllis.value) { assignGame(); resolve(); return }
+    ellisMelting.value = true
+    setTimeout(() => {
+      assignGame()
+      ellisMelting.value = false
+      ellisFadeIn.value = true
+      setTimeout(() => { ellisFadeIn.value = false; resolve() }, 1800)
+    }, 3500)
+  })
+}
+
+/**
+ * Dock Ellis no-hitter filter: makes Ellis nearly unhittable through 7 innings,
+ * then slowly lets hits creep in. Converts hits to outs through the 7th,
+ * then ramps hit probability up from innings 8-9 to keep it close.
+ */
+function _applyEllisNoHitter(state) {
+  const hitTypes = new Set(['single', 'double', 'triple', 'homerun'])
+  const outReplacements = ['groundout', 'flyout', 'lineout', 'groundout', 'flyout']
+  state._outcomeFilter = (st, outcome) => {
+    if (!hitTypes.has(outcome)) return outcome
+    // Through 7 innings: almost unhittable (5% chance a hit sneaks through)
+    if (st.inning <= 7) {
+      return Math.random() < 0.05 ? outcome : outReplacements[Math.floor(Math.random() * outReplacements.length)]
+    }
+    // Inning 8: hits start getting through more (~30% pass)
+    if (st.inning === 8) {
+      return Math.random() < 0.30 ? outcome : outReplacements[Math.floor(Math.random() * outReplacements.length)]
+    }
+    // Inning 9+: tense — ~45% of hits pass through, making it close
+    return Math.random() < 0.45 ? outcome : outReplacements[Math.floor(Math.random() * outReplacements.length)]
+  }
+}
+
 async function startGame() {
   loading.value = true
   try {
-    game.value = await createNewGame({
+    const newGame = await createNewGame({
       homeTeamId: teamSelected.value,
       season: selectedSeason.value,
       homePitcherId: selectedPitcherId.value,
@@ -1587,6 +1827,8 @@ async function startGame() {
       weather: selectedWeather.value,
       timeOfDay: selectedTimeOfDay.value,
     })
+    if (isDockEllis.value) _applyEllisNoHitter(newGame)
+    await _ellistMeltTransition(() => { game.value = newGame })
   } finally {
     loading.value = false
   }
@@ -1652,6 +1894,8 @@ async function startSimulation() {
       timeOfDay: selectedTimeOfDay.value,
       classicRelievers: _buildClassicRelievers(),
     })
+    // Dock Ellis: apply no-hitter filter for simulation too
+    if (isDockEllis.value) _applyEllisNoHitter(newGame)
     // Aaron 715 hook: force HR on his 2nd PA during simulation
     if (classicLabel.value === "Hank Aaron's 715th Home Run") {
       newGame._prePitchHook = (st) => {
@@ -1672,10 +1916,12 @@ async function startSimulation() {
     simSnapshots.value = result.snapshots || []
     simReplayIndex.value = 0
     simulating.value = true
-    // Step 4: Show the first snapshot merged with the initial game state
-    if (simSnapshots.value.length > 0) {
-      game.value = { ...newGame, ...simSnapshots.value[0] }
-    }
+    // Step 4: Show the first snapshot merged with the initial game state via melt transition
+    await _ellistMeltTransition(() => {
+      if (simSnapshots.value.length > 0) {
+        game.value = { ...newGame, ...simSnapshots.value[0] }
+      }
+    })
     // Step 5: Start the replay timer
     startReplayTimer()
   } finally {
@@ -1789,6 +2035,7 @@ function takeOverGame() {
  */
 onUnmounted(() => {
   stopReplayTimer()
+  if (ellisInterval) { clearInterval(ellisInterval); ellisInterval = null }
 })
 
 /**
@@ -1904,6 +2151,13 @@ function doBat(action) {
   game.value = { ...game.value }
 }
 
+/**
+ * Whether the "Steal" buttons should be visible (FREE — available to all users).
+ * True when the player is batting and at least one runner can attempt a steal:
+ *   - Runner on 1st with 2nd empty → can steal 2nd
+ *   - Runner on 2nd with 3rd empty → can steal 3rd
+ *   - Runner on 3rd → can steal home (very risky, ~30% success rate)
+ */
 const canSteal = computed(() => {
   if (!game.value || game.value.game_status !== 'active') return false
   if (game.value.player_role !== 'batting') return false
@@ -1911,6 +2165,10 @@ const canSteal = computed(() => {
   return (b[0] && !b[1]) || (b[1] && !b[2]) || b[2]
 })
 
+/**
+ * Attempt a steal and then process a pitch (batter "takes" while runner goes).
+ * The steal + pitch happen as a single action from the player's perspective.
+ */
 function doSteal(baseIdx) {
   attemptSteal(game.value, baseIdx)
   // A steal happens during a pitch — the batter takes while the runner goes.
@@ -1918,6 +2176,25 @@ function doSteal(baseIdx) {
   if (game.value.game_status === 'active' && game.value.player_role === 'batting') {
     processAtBat(game.value, 'take')
   }
+  game.value = { ...game.value }
+}
+
+/**
+ * Can the player attempt a pickoff? Only when pitching with runners on base.
+ */
+const canPickoff = computed(() => {
+  if (!game.value || game.value.game_status !== 'active') return false
+  if (game.value.player_role !== 'pitching') return false
+  const b = game.value.bases
+  return b[0] || b[1] || b[2]
+})
+
+/**
+ * Attempt a pickoff throw to a base. Unlike steals, no pitch is thrown —
+ * the pickoff replaces the pitch (the pitcher threw to the base instead of home).
+ */
+function doPickoff(baseIdx) {
+  attemptPickoff(game.value, baseIdx)
   game.value = { ...game.value }
 }
 
@@ -2018,6 +2295,38 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
    to cover the entire game area */
 .interactive-game {
   position: relative;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@keyframes screen-melt {
+  0%   { transform: scaleY(1) scaleX(1) translateY(0) skewX(0deg); opacity: 1; filter: blur(0) saturate(1); border-radius: 0; }
+  10%  { transform: scaleY(1) scaleX(1) translateY(2px) skewX(0.3deg); opacity: 1; filter: blur(0) saturate(1.5); }
+  20%  { transform: scaleY(0.98) scaleX(1.01) translateY(5px) skewX(-0.5deg); opacity: 0.95; filter: blur(0.5px) saturate(2); }
+  35%  { transform: scaleY(0.94) scaleX(1.03) translateY(15px) skewX(0.8deg); opacity: 0.9; filter: blur(1px) saturate(2.5) hue-rotate(10deg); }
+  50%  { transform: scaleY(0.85) scaleX(1.06) translateY(35px) skewX(-0.5deg); opacity: 0.8; filter: blur(1.5px) saturate(3) hue-rotate(25deg); border-radius: 0 0 20px 20px; }
+  65%  { transform: scaleY(0.7) scaleX(1.1) translateY(65px) skewX(1deg); opacity: 0.6; filter: blur(2px) saturate(3) hue-rotate(45deg); border-radius: 0 0 40px 40px; }
+  80%  { transform: scaleY(0.45) scaleX(1.15) translateY(110px) skewX(-0.5deg); opacity: 0.35; filter: blur(3px) saturate(2) hue-rotate(60deg); border-radius: 0 0 60% 60%; }
+  92%  { transform: scaleY(0.2) scaleX(1.2) translateY(160px) skewX(0deg); opacity: 0.15; filter: blur(4px) saturate(1) hue-rotate(80deg); border-radius: 0 0 80% 80%; }
+  100% { transform: scaleY(0.05) scaleX(1.25) translateY(200px) skewX(0deg); opacity: 0; filter: blur(6px) saturate(0.5) hue-rotate(90deg); border-radius: 0 0 100% 100%; }
+}
+
+@keyframes screen-fade-in {
+  0%   { opacity: 0; transform: translateY(30px); filter: blur(6px) hue-rotate(40deg); }
+  40%  { opacity: 0.6; transform: translateY(12px); filter: blur(3px) hue-rotate(15deg); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0) hue-rotate(0deg); }
+}
+
+.ellis-melting {
+  animation: screen-melt 3.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  transform-origin: bottom center;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ellis-fade-in {
+  animation: screen-fade-in 1.8s ease-out forwards;
 }
 
 /* ========== Title / Landing Screen ========== */
@@ -2407,6 +2716,46 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   transition: all 0.2s;
 }
 
+.scramble-text {
+  display: inline-flex;
+}
+
+.scramble-letter {
+  display: inline-block;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.letter-hidden {
+  opacity: 0;
+}
+
+@keyframes letter-melt-anim {
+  0%   { transform: translateY(0) scaleY(1); opacity: 1; }
+  100% { transform: translateY(20px) scaleY(2); opacity: 0; }
+}
+
+@keyframes letter-fall-anim {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(30px) rotate(25deg); opacity: 0; }
+}
+
+@keyframes letter-rise-anim {
+  0%   { transform: translateY(15px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.letter-melt {
+  animation: letter-melt-anim 0.4s ease-in forwards;
+}
+
+.letter-fall {
+  animation: letter-fall-anim 0.5s ease-in forwards;
+}
+
+.letter-rise {
+  animation: letter-rise-anim 0.4s ease-out forwards;
+}
+
 /* Lighter red on hover for the primary button */
 .play-btn:hover:not(:disabled) {
   background: #ff6b81;
@@ -2771,6 +3120,24 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
 
 .steal-btn:hover:not(:disabled) {
   background: #e94560;
+  color: #0a0a1a;
+}
+
+.pickoff-group {
+  margin-top: 8px;
+}
+
+.pickoff-btn {
+  background: transparent;
+  color: #e69c24;
+  border-color: #e69c24;
+  min-width: 110px;
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.pickoff-btn:hover:not(:disabled) {
+  background: #e69c24;
   color: #0a0a1a;
 }
 
@@ -3594,6 +3961,64 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   font-size: 13px;
   font-weight: bold;
   color: #eee;
+}
+
+/* Dock Ellis: slinky organic ripple animations on weather tiles */
+@keyframes ellis-slink-1 {
+  0%   { transform: scale(1) skewX(0deg) rotate(0deg); border-color: #333; }
+  15%  { transform: scale(1.04) skewX(2deg) rotate(0.5deg); border-color: #9b59b6; }
+  30%  { transform: scale(0.97) skewX(-1deg) rotate(-0.3deg); border-color: #e94560; }
+  50%  { transform: scale(1.02) skewX(1.5deg) rotate(0.8deg); border-color: #ff6b9d; }
+  65%  { transform: scale(0.98) skewX(-2deg) rotate(-0.5deg); border-color: #3498db; }
+  80%  { transform: scale(1.03) skewX(0.5deg) rotate(0.2deg); border-color: #2ecc71; }
+  100% { transform: scale(1) skewX(0deg) rotate(0deg); border-color: #333; }
+}
+
+@keyframes ellis-slink-2 {
+  0%   { transform: scale(1) skewY(0deg) rotate(0deg); border-color: #444; }
+  20%  { transform: scale(0.96) skewY(2.5deg) rotate(-1deg); border-color: #e74c3c; }
+  40%  { transform: scale(1.05) skewY(-1deg) rotate(0.6deg); border-color: #f39c12; }
+  60%  { transform: scale(0.98) skewY(1.5deg) rotate(-0.4deg); border-color: #8e44ad; }
+  85%  { transform: scale(1.03) skewY(-2deg) rotate(0.7deg); border-color: #1abc9c; }
+  100% { transform: scale(1) skewY(0deg) rotate(0deg); border-color: #444; }
+}
+
+@keyframes ellis-slink-3 {
+  0%   { transform: scale(1) translate(0, 0) rotate(0deg); border-color: #333; }
+  18%  { transform: scale(1.03) translate(2px, -1px) rotate(0.4deg); border-color: #e94560; }
+  35%  { transform: scale(0.97) translate(-1px, 2px) rotate(-0.6deg); border-color: #3498db; }
+  55%  { transform: scale(1.04) translate(1px, -2px) rotate(0.3deg); border-color: #f1c40f; }
+  72%  { transform: scale(0.99) translate(-2px, 1px) rotate(-0.8deg); border-color: #9b59b6; }
+  100% { transform: scale(1) translate(0, 0) rotate(0deg); border-color: #333; }
+}
+
+.ellis-ripple {
+  animation: ellis-slink-1 12s ease-in-out infinite;
+}
+
+.ellis-ripple:nth-child(2) {
+  animation: ellis-slink-2 10s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.ellis-ripple:nth-child(3) {
+  animation: ellis-slink-3 14s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+.ellis-ripple:nth-child(4) {
+  animation: ellis-slink-2 13s ease-in-out infinite reverse;
+  animation-delay: 0.8s;
+}
+
+.ellis-ripple .weather-icon {
+  transition: none;
+}
+
+.ellis-disabled {
+  opacity: 0.3;
+  cursor: not-allowed !important;
+  pointer-events: none;
 }
 
 .weather-detail {
