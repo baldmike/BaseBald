@@ -561,32 +561,33 @@
 
       <!--
         Field Layout — a horizontal flex row with:
-          Left: Pitcher headshot + name
+          Left: Away team player
           Center: Baseball diamond SVG
-          Right: Batter headshot + name
+          Right: Home team player
 
-        This layout mimics the real pitcher-batter confrontation view.
+        Teams stay on the same side throughout the game. The role label
+        (PITCHING / AT BAT) changes based on which half of the inning it is.
       -->
       <div class="field-layout">
-        <!-- Pitcher card (left side) — shows who is currently on the mound -->
+        <!-- Away team card (left side) -->
         <div class="player-card pitcher-side">
           <div class="headshot-wrapper">
             <img
-              v-if="currentPitcher?.id"
-              :src="headshotUrl(currentPitcher.id)"
-              :alt="currentPitcherName"
+              v-if="awayFieldPlayer?.id"
+              :src="headshotUrl(awayFieldPlayer.id)"
+              :alt="awayFieldPlayer.name"
               class="player-headshot"
             />
-            <img :src="teamLogoUrl(currentPitcherTeamId)" class="player-team-badge" />
+            <img :src="teamLogoUrl(selectedOpponentId)" class="player-team-badge" />
           </div>
           <div class="player-card-info">
-            <span class="player-card-label">PITCHING</span>
-            <span class="player-card-name pitcher-name">{{ currentPitcherName }}</span>
+            <span class="player-card-label">{{ game.is_top ? 'AT BAT' : 'PITCHING' }}</span>
+            <span class="player-card-name" :class="game.is_top ? 'batter-name-text' : 'pitcher-name'">{{ awayFieldPlayer?.name || '' }}</span>
           </div>
-          <div class="fatigue-meter">
-            <span class="pitch-count">{{ currentPitchCount }} pitches</span>
+          <div v-if="!game.is_top" class="fatigue-meter">
+            <span class="pitch-count">{{ game.away_pitch_count }} pitches</span>
             <div class="fatigue-bar">
-              <div class="fatigue-fill" :style="{ width: fatiguePercent + '%' }" :class="fatigueLevel"></div>
+              <div class="fatigue-fill" :style="{ width: awayFatiguePercent + '%' }" :class="awayFatigueLevel"></div>
             </div>
           </div>
         </div>
@@ -594,20 +595,26 @@
         <!-- Baseball diamond SVG — shows base occupancy with runner dots -->
         <BaseballDiamond :bases="game.bases" />
 
-        <!-- Batter card (right side) — shows who is currently at bat -->
+        <!-- Home team card (right side) -->
         <div class="player-card batter-side">
           <div class="headshot-wrapper">
             <img
-              v-if="currentBatter?.id"
-              :src="headshotUrl(currentBatter.id)"
-              :alt="game.current_batter_name"
+              v-if="homeFieldPlayer?.id"
+              :src="headshotUrl(homeFieldPlayer.id)"
+              :alt="homeFieldPlayer.name"
               class="player-headshot"
             />
-            <img :src="teamLogoUrl(currentBatterTeamId)" class="player-team-badge" />
+            <img :src="teamLogoUrl(teamSelected)" class="player-team-badge" />
           </div>
           <div class="player-card-info">
-            <span class="player-card-label">AT BAT</span>
-            <span class="player-card-name batter-name-text">{{ game.current_batter_name }}</span>
+            <span class="player-card-label">{{ game.is_top ? 'PITCHING' : 'AT BAT' }}</span>
+            <span class="player-card-name" :class="game.is_top ? 'pitcher-name' : 'batter-name-text'">{{ homeFieldPlayer?.name || '' }}</span>
+          </div>
+          <div v-if="game.is_top" class="fatigue-meter">
+            <span class="pitch-count">{{ game.home_pitch_count }} pitches</span>
+            <div class="fatigue-bar">
+              <div class="fatigue-fill" :style="{ width: homeFatiguePercent + '%' }" :class="homeFatigueLevel"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -648,8 +655,8 @@
           <button class="deck-btn" :class="{ active: simSpeed === 300 }" @click="setSimSpeed(300)" title="Fast">&#9654;&#9654;</button>
           <button class="deck-btn deck-pause" :class="{ active: simPaused }" @click="toggleSimPause()" title="Pause / Resume"></button>
           <button class="deck-btn deck-stop" @click="skipToEnd()" title="Skip to End">&#9632;</button>
+          <button class="deck-btn deck-takeover" @click="takeOverGame()" title="Take Over &amp; Play">&#9654;|</button>
         </div>
-        <button class="action-btn takeover-btn" @click="takeOverGame()">Take Over &amp; Play</button>
       </div>
 
       <!--
@@ -765,7 +772,7 @@
             >Steal Home</button>
           </div>
         </div>
-        <button v-if="lastSnapshot" class="action-btn doover-btn" @click="doOver()" :disabled="loading">Do Over!</button>
+        <button v-if="lastSnapshot && showDoOver" class="action-btn doover-btn" @click="doOver()" :disabled="loading">Do Over!</button>
         <button class="action-btn sim-rest-btn" @click="simulateRest()" :disabled="loading">Simulate Rest of Game</button>
       </div>
 
@@ -887,9 +894,9 @@
           </table>
         </div>
 
-        <!-- Pitching summary -->
-        <div class="box-team" v-if="game.away_pitcher_stats || game.home_pitcher_stats">
-          <h3 class="box-team-header">Pitching</h3>
+        <!-- Away pitching -->
+        <div class="box-team" v-if="game.away_pitcher_stats">
+          <h3 class="box-team-header">{{ game.away_abbreviation || 'AWAY' }} Pitching</h3>
           <table class="box-table">
             <thead>
               <tr>
@@ -903,8 +910,17 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-if="game.away_pitcher_stats">
-                <td class="box-name">{{ game.away_pitcher_stats.name }} ({{ game.away_abbreviation || 'AWAY' }})</td>
+              <tr v-for="ps in (game.away_pitcher_history || [])" :key="ps.id">
+                <td class="box-name">{{ ps.name }}</td>
+                <td>{{ formatIP(ps.ip_outs) }}</td>
+                <td>{{ ps.h }}</td>
+                <td>{{ ps.r }}</td>
+                <td>{{ ps.er }}</td>
+                <td>{{ ps.bb }}</td>
+                <td>{{ ps.so }}</td>
+              </tr>
+              <tr>
+                <td class="box-name">{{ game.away_pitcher_stats.name }}</td>
                 <td>{{ formatIP(game.away_pitcher_stats.ip_outs) }}</td>
                 <td>{{ game.away_pitcher_stats.h }}</td>
                 <td>{{ game.away_pitcher_stats.r }}</td>
@@ -912,8 +928,37 @@
                 <td>{{ game.away_pitcher_stats.bb }}</td>
                 <td>{{ game.away_pitcher_stats.so }}</td>
               </tr>
-              <tr v-if="game.home_pitcher_stats">
-                <td class="box-name">{{ game.home_pitcher_stats.name }} ({{ game.home_abbreviation || 'HOME' }})</td>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Home pitching -->
+        <div class="box-team" v-if="game.home_pitcher_stats">
+          <h3 class="box-team-header">{{ game.home_abbreviation || 'HOME' }} Pitching</h3>
+          <table class="box-table">
+            <thead>
+              <tr>
+                <th class="box-name">Pitcher</th>
+                <th>IP</th>
+                <th>H</th>
+                <th>R</th>
+                <th>ER</th>
+                <th>BB</th>
+                <th>SO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="ps in (game.home_pitcher_history || [])" :key="ps.id">
+                <td class="box-name">{{ ps.name }}</td>
+                <td>{{ formatIP(ps.ip_outs) }}</td>
+                <td>{{ ps.h }}</td>
+                <td>{{ ps.r }}</td>
+                <td>{{ ps.er }}</td>
+                <td>{{ ps.bb }}</td>
+                <td>{{ ps.so }}</td>
+              </tr>
+              <tr>
+                <td class="box-name">{{ game.home_pitcher_stats.name }}</td>
                 <td>{{ formatIP(game.home_pitcher_stats.ip_outs) }}</td>
                 <td>{{ game.home_pitcher_stats.h }}</td>
                 <td>{{ game.home_pitcher_stats.r }}</td>
@@ -1532,15 +1577,49 @@ const fatigueLevel = computed(() => {
   return 'fresh'
 })
 
-/** Team ID of the current pitcher (for team logo badge). */
-const currentPitcherTeamId = computed(() =>
-  game.value?.is_top ? teamSelected.value : selectedOpponentId.value
-)
+/** The away team's active player shown in the field layout (pitcher or batter depending on half-inning). */
+const awayFieldPlayer = computed(() => {
+  if (!game.value) return null
+  if (game.value.is_top) {
+    // Top of inning: away team is batting
+    const lineup = game.value.away_lineup
+    const idx = game.value.current_batter_index || 0
+    return lineup?.[idx] || null
+  }
+  // Bottom of inning: away team is pitching
+  return game.value.away_pitcher
+})
 
-/** Team ID of the current batter (for team logo badge). */
-const currentBatterTeamId = computed(() =>
-  game.value?.is_top ? selectedOpponentId.value : teamSelected.value
-)
+/** The home team's active player shown in the field layout (pitcher or batter depending on half-inning). */
+const homeFieldPlayer = computed(() => {
+  if (!game.value) return null
+  if (game.value.is_top) {
+    // Top of inning: home team is pitching
+    return game.value.home_pitcher
+  }
+  // Bottom of inning: home team is batting
+  const lineup = game.value.home_lineup
+  const idx = game.value.current_batter_index || 0
+  return lineup?.[idx] || null
+})
+
+/** Fatigue percent/level for the away pitcher. */
+const awayFatiguePercent = computed(() => Math.min(100, ((game.value?.away_pitch_count || 0) / 120) * 100))
+const awayFatigueLevel = computed(() => {
+  const pc = game.value?.away_pitch_count || 0
+  if (pc >= 100) return 'gassed'
+  if (pc >= 85) return 'tired'
+  return 'fresh'
+})
+
+/** Fatigue percent/level for the home pitcher. */
+const homeFatiguePercent = computed(() => Math.min(100, ((game.value?.home_pitch_count || 0) / 120) * 100))
+const homeFatigueLevel = computed(() => {
+  const pc = game.value?.home_pitch_count || 0
+  if (pc >= 100) return 'gassed'
+  if (pc >= 85) return 'tired'
+  return 'fresh'
+})
 
 // ============================================================
 // UTILITY FUNCTIONS
@@ -2077,9 +2156,17 @@ function takeOverGame() {
  * Prevents memory leaks from orphaned setInterval timers
  * if the user navigates away during a simulation.
  */
+function _handleDoOverShortcut(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+    e.preventDefault()
+    showDoOver.value = !showDoOver.value
+  }
+}
+
 onUnmounted(() => {
   stopReplayTimer()
   if (ellisInterval) { clearInterval(ellisInterval); ellisInterval = null }
+  window.removeEventListener('keydown', _handleDoOverShortcut)
 })
 
 /**
@@ -2135,6 +2222,7 @@ async function resetGame() {
 
 /** Deep-clone the game state for Do Over snapshots */
 const lastSnapshot = ref(null)
+const showDoOver = ref(false)
 
 function _saveSnapshot() {
   const g = game.value
@@ -2367,6 +2455,7 @@ watch(selectedAwaySeason, async (newSeason) => {
 // Fetch teams for the default season on mount
 onMounted(async () => {
   homeTeams.value = await getAllTeams(selectedSeason.value)
+  window.addEventListener('keydown', _handleDoOverShortcut)
 })
 
 /** Whether a game is actively in progress (used by App.vue to hide the header). */
@@ -3515,23 +3604,17 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame })
   background: #fff;
 }
 
-.takeover-btn {
-  display: block;
-  margin: 10px auto 0;
-  background: transparent;
+.deck-takeover {
   color: #4caf50;
-  border: 2px solid #4caf50;
-  padding: 8px 24px;
+  border-color: #4caf50;
   font-size: 14px;
   font-weight: bold;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s;
+  letter-spacing: -1px;
 }
 
-.takeover-btn:hover {
+.deck-takeover:hover {
   background: #4caf50;
-  color: white;
+  color: #0a0a1a;
 }
 
 /* ========== Sound Toggle ========== */

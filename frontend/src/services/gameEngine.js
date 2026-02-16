@@ -115,6 +115,8 @@ function _emptyState() {
     // --- Pitcher stats (for the game) ---
     away_pitcher_stats: null,  // {id, name, ip_outs, h, r, er, bb, so}
     home_pitcher_stats: null,
+    away_pitcher_history: [],  // previous pitchers' stats (in order they pitched)
+    home_pitcher_history: [],
 
     // --- Weather & time of day (FREE: weather selection, PREMIUM: time of day) ---
     weather: null,             // weather key (e.g., 'clear', 'rain') — affects hit/error probabilities
@@ -608,6 +610,8 @@ function _snapshot(state) {
     home_box_score: state.home_box_score.map((b) => ({ ...b })),
     away_pitcher_stats: state.away_pitcher_stats ? { ...state.away_pitcher_stats } : null,
     home_pitcher_stats: state.home_pitcher_stats ? { ...state.home_pitcher_stats } : null,
+    away_pitcher_history: (state.away_pitcher_history || []).map((s) => ({ ...s })),
+    home_pitcher_history: (state.home_pitcher_history || []).map((s) => ({ ...s })),
     weather: state.weather,
     time_of_day: state.time_of_day,
     home_pitch_count: state.home_pitch_count,
@@ -628,6 +632,12 @@ export function switchPitcher(state, side, newPitcher) {
   const isHome = side === 'home'
   newPitcher.activeStats = (isHome ? newPitcher.splits?.home : newPitcher.splits?.away) || newPitcher.stats
   const oldPitcher = state[side + '_pitcher']
+  // Save outgoing pitcher's stats to history
+  if (!state[side + '_pitcher_history']) state[side + '_pitcher_history'] = []
+  const oldStats = state[side + '_pitcher_stats']
+  if (oldStats) {
+    state[side + '_pitcher_history'].push({ ...oldStats })
+  }
   state[side + '_pitcher'] = newPitcher
   state[side + '_pitch_count'] = 0
   state[side + '_pitcher_stats'] = {
