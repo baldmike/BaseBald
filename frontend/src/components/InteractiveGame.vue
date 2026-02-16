@@ -381,9 +381,19 @@
 
       <!-- Aaron 715 announcement overlay -->
       <div v-if="aaronAnnouncement" class="game-over-overlay">
-        <div class="game-over-card aaron-card">
-          <h2>Hank Aaron has just broken Babe Ruth's record, with 715 Home Runs!</h2>
-          <button class="play-btn" @click="dismissAaronAnnouncement">Continue Game</button>
+        <div class="aaron-overlay-content">
+          <div class="aaron-video">
+            <iframe
+              src="https://www.youtube.com/embed/QjqYThEVoSQ?autoplay=1"
+              allow="autoplay; encrypted-media"
+              allowfullscreen
+              frameborder="0"
+            ></iframe>
+          </div>
+          <div class="aaron-card">
+            <h2>Hank Aaron has just broken Babe Ruth's record with 715 Home Runs!</h2>
+            <button class="play-btn" @click="dismissAaronAnnouncement">Continue Game</button>
+          </div>
         </div>
       </div>
 
@@ -1787,7 +1797,6 @@ function _triggerAaron715() {
   if (aaronVideoOpened.value) return
   aaronVideoOpened.value = true
   aaronAnnouncement.value = true
-  window.open('https://www.youtube.com/watch?v=QjqYThEVoSQ', '_blank')
 }
 
 function _afterAaron715(state) {
@@ -2430,10 +2439,38 @@ defineExpose({ showBackButton, handleBack, isPlaying })
   padding: 40px;
 }
 
+.aaron-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.aaron-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.aaron-video iframe {
+  width: 100%;
+  height: 100%;
+}
+
+.aaron-card {
+  text-align: center;
+  padding: 20px;
+}
+
 .aaron-card h2 {
   font-size: 24px;
   color: #f0c040;
   line-height: 1.4;
+  margin-bottom: 16px;
 }
 
 /* "Game Over!" heading */
