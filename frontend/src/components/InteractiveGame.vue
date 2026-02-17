@@ -567,6 +567,9 @@
         :current-batter-name="game.current_batter_name"
         :away-team-id="resolvedAwayTeamId || 0"
         :home-team-id="resolvedHomeTeamId || 0"
+        :play-log="game.play_log || []"
+        :play-log-index="playLogIndex"
+        @update:play-log-index="playLogIndex = $event"
       />
 
       <!-- Weather banner — shows the current weather condition during the game -->
@@ -786,26 +789,6 @@
           </button>
           <button class="action-btn bottom-ctrl-btn" @click="simulateRest()" :disabled="loading">Simulate Rest of Game</button>
         </div>
-      </div>
-
-      <!--
-        Last Play Banner — shows the most recent play description from the game engine.
-        Styled prominently in yellow on a dark background so the user can see
-        what just happened at a glance. Prev/next arrows let the user browse
-        through the full play_log history.
-      -->
-      <div class="last-play" v-if="game.play_log && game.play_log.length">
-        <button
-          class="play-nav-btn"
-          :disabled="playLogIndex <= 0"
-          @click="playLogIndex--"
-        >&lsaquo;</button>
-        <p class="play-text">{{ game.play_log[playLogIndex] }}</p>
-        <button
-          class="play-nav-btn"
-          :disabled="playLogIndex >= game.play_log.length - 1"
-          @click="playLogIndex++"
-        >&rsaquo;</button>
       </div>
 
       <!--
@@ -3469,59 +3452,6 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 }
 
 /* ========== Last Play Banner ========== */
-/*
-  Highlighted banner showing the most recent play description.
-  Yellow text on dark blue with a red border makes it stand out
-  as the most important piece of real-time information.
-*/
-.last-play {
-  background: #3a3a4a;
-  border: 1px solid #e94560;
-  border-radius: 6px;
-  padding: 10px 16px;
-  margin: 12px 0;
-  text-align: center;
-  font-size: 15px;
-  color: #e94560;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.last-play .play-text {
-  flex: 1;
-  margin: 0;
-}
-
-/* Prev/next arrows for browsing play history */
-.play-nav-btn {
-  background: transparent;
-  border: 1px solid #e94560;
-  color: #e94560;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
-  line-height: 1;
-}
-
-.play-nav-btn:hover:not(:disabled) {
-  background: #e94560;
-  color: white;
-}
-
-.play-nav-btn:disabled {
-  opacity: 0.25;
-  cursor: default;
-}
-
 /* ========== Interactive Controls (Pitch/Bat Buttons) ========== */
 /* Container with vertical margin around the control buttons */
 .controls {
@@ -4558,12 +4488,6 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
     width: 40px;
     height: 34px;
     font-size: 13px;
-  }
-
-  /* Last play banner: smaller text */
-  .last-play {
-    font-size: 13px;
-    padding: 8px 10px;
   }
 
   .weather-grid {

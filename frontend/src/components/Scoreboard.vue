@@ -147,6 +147,21 @@
         </div>
       </div>
     </div>
+
+    <!-- Last Play Banner — shows the most recent play description -->
+    <div class="last-play" v-if="playLog && playLog.length">
+      <button
+        class="play-nav-btn"
+        :disabled="currentPlayIndex <= 0"
+        @click="$emit('update:playLogIndex', currentPlayIndex - 1)"
+      >&lsaquo;</button>
+      <p class="play-text">{{ playLog[currentPlayIndex] }}</p>
+      <button
+        class="play-nav-btn"
+        :disabled="currentPlayIndex >= playLog.length - 1"
+        @click="$emit('update:playLogIndex', currentPlayIndex + 1)"
+      >&rsaquo;</button>
+    </div>
   </div>
 </template>
 
@@ -194,7 +209,15 @@ const props = defineProps({
   awayErrors: { type: Number, default: 0 },
   /** Total errors for the home team */
   homeErrors: { type: Number, default: 0 },
+  /** Play log array of play description strings */
+  playLog: { type: Array, default: () => [] },
+  /** Current index into the play log */
+  playLogIndex: { type: Number, default: 0 },
 })
+
+defineEmits(['update:playLogIndex'])
+
+const currentPlayIndex = computed(() => props.playLogIndex)
 
 /** Build the MLB CDN URL for a team's logo SVG. */
 function logoUrl(teamId) {
@@ -469,5 +492,50 @@ const gridStyle = computed(() => ({
     width: 12px;
     height: 12px;
   }
+
+  .last-play {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+}
+
+/* ========== Last Play Banner ========== */
+.last-play {
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid #333;
+  text-align: center;
+  font-size: 15px;
+  color: #ffffff;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.last-play .play-text {
+  flex: 1;
+  margin: 0;
+}
+
+.play-nav-btn {
+  background: none;
+  border: 1px solid #555;
+  color: #ccc;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 8px;
+  line-height: 1;
+}
+
+.play-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.play-nav-btn:hover:not(:disabled) {
+  border-color: #e94560;
+  color: #fff;
 }
 </style>
