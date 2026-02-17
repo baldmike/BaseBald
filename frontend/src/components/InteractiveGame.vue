@@ -513,7 +513,7 @@
       This includes: sound toggle, game-over overlay, scoreboard, field layout
       (diamond + player headshots), last play banner, controls, and play log.
     -->
-    <div v-if="game" class="game-wrapper" :class="{ 'called-shot-bg': isCalledShot }">
+    <div v-if="game" :class="{ 'called-shot-bg': isCalledShot }">
 
       <!--
         Game Over Overlay — a semi-transparent dark overlay that covers
@@ -768,8 +768,16 @@
         - Batting: user is a home team batter (bottom of inning, home team bats)
       -->
       <div class="controls" v-if="game.game_status === 'active' && !simulating">
-        <!-- Pitching / Batting actions (top row) -->
         <div class="action-bar" :class="{ pitching: game.player_role === 'pitching' }">
+          <!-- Left-justified change pitcher button (pitching only) -->
+          <button
+            v-if="game.player_role === 'pitching' && game[myPrefix + '_bullpen'].length"
+            class="action-btn change-pitcher-action-btn"
+            @click="showBullpen = true"
+            :disabled="loading"
+          >Change Pitcher ({{ Math.max(0, 100 - Math.round(fatiguePercent)) }}%)</button>
+
+          <!-- Pitching buttons -->
           <template v-if="game.player_role === 'pitching'">
             <button
               v-for="pitch in pitchTypes"
@@ -783,6 +791,7 @@
             </button>
           </template>
 
+          <!-- Batting buttons -->
           <template v-if="game.player_role === 'batting'">
             <button class="action-btn swing-btn" @click="doBat('swing')" :disabled="loading">
               Swing!
@@ -800,16 +809,8 @@
               :disabled="loading"
             >Squeeze</button>
           </template>
-        </div>
 
-        <!-- Manager actions (bottom row): Change Pitcher + Start Sim -->
-        <div class="utility-bar">
-          <button
-            v-if="game.player_role === 'pitching' && game[myPrefix + '_bullpen'].length"
-            class="action-btn change-pitcher-action-btn"
-            @click="showBullpen = true"
-            :disabled="loading"
-          >Change Pitcher ({{ Math.max(0, 100 - Math.round(fatiguePercent)) }}%)</button>
+          <!-- Right-justified sim button -->
           <button class="action-btn sim-btn" @click="simulateRest()" :disabled="loading">Start Sim</button>
         </div>
 
@@ -3687,13 +3688,11 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   50% { transform: rotate(3deg) scale(1.05); }
 }
 
-/* Babe Ruth's Called Shot — B&W Wrigley Field background (desktop only) */
-@media (min-width: 601px) {
-  .called-shot-bg {
-    background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
-    background-blend-mode: normal, luminosity;
-    border-radius: 8px;
-  }
+/* Babe Ruth's Called Shot — B&W Wrigley Field background */
+.called-shot-bg {
+  background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
+  background-blend-mode: normal, luminosity;
+  border-radius: 8px;
 }
 
 /* Babe Ruth's Called Shot cinematic */
@@ -3838,19 +3837,17 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 }
 
 /* Single-row action bar: pitch/bat buttons centered, sim button right */
-.utility-bar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8px;
-}
-
 .action-bar {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.action-bar .sim-btn {
+  position: absolute;
+  right: 0;
 }
 
 .change-pitcher-action-btn {
@@ -3864,6 +3861,10 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   color: white;
 }
 
+.action-bar .change-pitcher-action-btn {
+  position: absolute;
+  left: 0;
+}
 
 /* Inverted (filled) button colors when pitching */
 .action-bar.pitching .pitch-btn {
@@ -4823,43 +4824,17 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
     padding: 30px 10px;
   }
 
-  /* Flex column on game wrapper so we can reorder sections */
-  .game-wrapper {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Reorder: scoreboard (default) → controls → field → weather */
-  .controls {
-    order: 2;
-  }
-
-  .field-layout {
-    order: 3;
-  }
-
-  .weather-banner {
-    order: 4;
-  }
-
   /* Stack field layout vertically: pitcher on top, diamond, batter below */
   .field-layout {
     flex-direction: column;
-    align-items: center;
     gap: 4px;
   }
 
   .player-card {
     flex-direction: row;
-    justify-content: center;
     width: auto;
     min-height: auto;
     gap: 8px;
-  }
-
-  /* Space above the player card below the diamond */
-  .field-layout .player-card:last-child {
-    margin-top: 12px;
   }
 
   .player-headshot {
@@ -4872,12 +4847,7 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
     align-items: flex-start;
   }
 
-  /* Action buttons: wrap to two lines on mobile */
-  .action-bar {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
+  /* Smaller action buttons on mobile */
   .action-btn {
     padding: 6px 10px;
     font-size: 12px;
