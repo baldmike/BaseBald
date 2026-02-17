@@ -499,6 +499,10 @@ const gridStyle = computed(() => ({
     font-size: 13px;
     padding: 8px 10px;
   }
+
+  .scoreboard {
+    min-height: 140px;
+  }
 }
 
 /* ========== Last Play Banner ========== */
