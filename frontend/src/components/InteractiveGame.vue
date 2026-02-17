@@ -2343,15 +2343,18 @@ function startReplayTimer() {
     // (score, bases, count, play_log, etc.).
     const snap = simSnapshots.value[simReplayIndex.value]
     game.value = { ...game.value, ...snap }
-    // Pause simulation for Called Shot cinematic
+    // Pause simulation for Called Shot cinematic on Ruth's 3rd PA
     if (classicLabel.value === "Babe Ruth's Called Shot" && !calledShotShown) {
       const ruthIdx = game.value.away_lineup?.findIndex(b => b.name && /\bRuth\b/i.test(b.name))
       if (ruthIdx >= 0) {
         const box = snap.away_box_score?.[ruthIdx]
-        if (box && box.hr >= 1) {
-          stopReplayTimer()
-          _startCalledShot(null)
-          return
+        if (box) {
+          const pa = (box.ab || 0) + (box.bb || 0)
+          if (pa >= 2) {
+            stopReplayTimer()
+            _startCalledShot(null)
+            return
+          }
         }
       }
     }

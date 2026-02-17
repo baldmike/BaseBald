@@ -2341,3 +2341,37 @@ describe('simulation', () => {
     expect(final.game_status).toBe('final')
   })
 })
+
+// ──────────────────────────────────────────────
+// CALLED SHOT DETECTION
+// ──────────────────────────────────────────────
+describe("Babe Ruth's Called Shot detection", () => {
+  it('Ruth reaches 3rd PA in a simulated game (pa >= 2 in box score)', () => {
+    const state = makeGameState()
+    // Put "Babe Ruth" in the away lineup at index 2 (3rd batter)
+    state.away_lineup[2] = { id: 999, name: 'Babe Ruth', stats: { avg: 0.341, slg: 0.700, k_rate: 0.090, hr_rate: 0.086 } }
+    state.away_box_score[2] = { id: 999, name: 'Babe Ruth', pos: 'RF', ab: 0, r: 0, h: 0, '2b': 0, '3b': 0, hr: 0, rbi: 0, bb: 0, so: 0, sb: 0 }
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    const { state: final, snapshots } = simulateGame(state)
+    // Ruth bats 3rd — in a full 9-inning game he should get at least 3 PA
+    const ruthBox = final.away_box_score[2]
+    const ruthPA = (ruthBox.ab || 0) + (ruthBox.bb || 0)
+    expect(ruthPA).toBeGreaterThanOrEqual(2)
+    // Verify a snapshot exists where Ruth has exactly 2 PA (the trigger point)
+    const triggerSnap = snapshots.find(snap => {
+      const box = snap.away_box_score?.[2]
+      if (!box) return false
+      return (box.ab || 0) + (box.bb || 0) >= 2
+    })
+    expect(triggerSnap).toBeDefined()
+  })
+
+  it('Ruth name is matched by regex /\\bRuth\\b/i', () => {
+    expect(/\bRuth\b/i.test('Babe Ruth')).toBe(true)
+    expect(/\bRuth\b/i.test('ruth')).toBe(true)
+    expect(/\bRuth\b/i.test('Ruthless')).toBe(false)
+  })
+})
