@@ -676,8 +676,7 @@
       -->
       <div class="field-layout">
         <!-- Away team card (left side) -->
-        <div class="player-card pitcher-side">
-          <span v-if="game.player_side === 'away'" class="you-dot"></span>
+        <div class="player-card pitcher-side" :class="{ 'your-team': game.player_side === 'away' }">
           <div class="headshot-wrapper">
             <img
               v-if="awayFieldPlayer?.id"
@@ -704,8 +703,7 @@
         <BaseballDiamond :bases="game.bases" :leadoffs="runnerLeadoffs" />
 
         <!-- Home team card (right side) -->
-        <div class="player-card batter-side">
-          <span v-if="game.player_side === 'home'" class="you-dot"></span>
+        <div class="player-card batter-side" :class="{ 'your-team': game.player_side === 'home' }">
           <div class="headshot-wrapper">
             <img
               v-if="homeFieldPlayer?.id"
@@ -3493,19 +3491,10 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 */
 .field-layout {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 12px;
   margin: 8px 0;
-}
-
-.you-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4caf50;
-  display: block;
-  margin-bottom: 4px;
 }
 
 /* Player card container (used for both pitcher and batter) */
@@ -3515,6 +3504,14 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   align-items: center;
   width: 100px;
   min-height: 120px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  transition: box-shadow 0.3s, background 0.3s;
+}
+
+.player-card.your-team {
+  background: rgba(76, 175, 80, 0.1);
+  box-shadow: 0 0 12px 4px rgba(76, 175, 80, 0.35);
 }
 
 /*
