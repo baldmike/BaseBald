@@ -1117,3 +1117,71 @@ describe('game length', () => {
     }
   })
 })
+
+// ──────────────────────────────────────────────
+// STRIKEOUT — exactly 3 strikes triggers a strikeout
+// ──────────────────────────────────────────────
+describe('strikeout', () => {
+  it('3 consecutive strikes result in a strikeout', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    for (let i = 0; i < 2; i++) {
+      state._forceNextOutcome = 'strike_swinging'
+      processAtBat(state, 'swing')
+      expect(state.strikes).toBe(i + 1)
+    }
+    // 3rd strike triggers the strikeout — count resets, out recorded
+    state._forceNextOutcome = 'strike_swinging'
+    processAtBat(state, 'swing')
+    expect(state.strikes).toBe(0) // count resets after strikeout
+    expect(state.outs).toBe(1)
+    expect(state.play_log.some(m => m.includes('Strikeout'))).toBe(true)
+  })
+
+  it('strikeout credits batter SO and pitcher SO', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    for (let i = 0; i < 3; i++) {
+      state._forceNextOutcome = 'strike_looking'
+      processAtBat(state, 'take')
+    }
+    expect(state.home_box_score[0].so).toBe(1)
+    expect(state.away_pitcher_stats.so).toBe(1)
+  })
+
+  it('2 strikes does not trigger a strikeout', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    for (let i = 0; i < 2; i++) {
+      state._forceNextOutcome = 'strike_swinging'
+      processAtBat(state, 'swing')
+    }
+    expect(state.strikes).toBe(2)
+    expect(state.outs).toBe(0)
+    expect(state.home_box_score[0].so).toBe(0)
+  })
+
+  it('foul balls do not add a 3rd strike (capped at 2)', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    // Get to 2 strikes
+    state._forceNextOutcome = 'strike_swinging'
+    processAtBat(state, 'swing')
+    state._forceNextOutcome = 'strike_swinging'
+    processAtBat(state, 'swing')
+    expect(state.strikes).toBe(2)
+    // Foul balls should not advance past 2 strikes
+    state._forceNextOutcome = 'foul'
+    processAtBat(state, 'swing')
+    expect(state.strikes).toBe(2)
+    expect(state.outs).toBe(0) // no strikeout
+    state._forceNextOutcome = 'foul'
+    processAtBat(state, 'swing')
+    expect(state.strikes).toBe(2)
+    expect(state.outs).toBe(0) // still no strikeout
+  })
+})
