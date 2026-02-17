@@ -3093,7 +3093,7 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 .mode-picker {
   text-align: center;
   padding: 40px 20px;
-  background: linear-gradient(rgba(15, 15, 35, 0.82), rgba(26, 26, 46, 0.92)), url('/baseball-bg.jpg') center/cover no-repeat;
+  background: linear-gradient(rgba(15, 15, 35, 0.82), rgba(26, 26, 46, 0.92));
   border-radius: 10px;
   min-height: 80vh;
   display: flex;
@@ -3738,8 +3738,7 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 
 /* Babe Ruth's Called Shot — B&W Wrigley Field background */
 .called-shot-bg {
-  background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
-  background-blend-mode: normal, luminosity;
+  background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7));
   border-radius: 8px;
 }
 
@@ -4867,14 +4866,6 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 
 /* ========== Mobile Responsive ========== */
 @media (max-width: 600px) {
-  .mode-picker {
-    background-image: none !important;
-  }
-
-  .called-shot-bg {
-    background-image: none !important;
-  }
-
   /* Tighter padding on wizard screens */
   .start-screen {
     padding: 16px 10px;
@@ -4978,6 +4969,18 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 
   .weather-icon {
     font-size: 18px;
+  }
+
+  /* Move Change Pitcher and Start Sim to their own row on mobile */
+  .action-bar {
+    flex-wrap: wrap;
+    position: static;
+  }
+
+  .action-bar .sim-btn,
+  .action-bar .change-pitcher-action-btn {
+    position: static;
+    order: 10;
   }
 }
 

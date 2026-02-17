@@ -1827,3 +1827,517 @@ describe('simulation leadoffs and steals', () => {
     expect(final.play_log.some(m => m.includes('Throw to'))).toBe(true)
   })
 })
+
+// ──────────────────────────────────────────────
+// RUNNER ADVANCEMENT ON HITS
+// ──────────────────────────────────────────────
+describe('runner advancement on hits', () => {
+  it('single with runner on 2nd moves runner to 3rd', () => {
+    const state = makeGameState()
+    state.bases = [false, true, false]
+    state.runner_indices = [null, 3, null]
+    state._outcomeFilter = () => 'single'
+    processPitch(state, 'fastball')
+    expect(state.bases[2]).toBe(true)
+    expect(state.bases[1]).toBe(false)
+    expect(state.bases[0]).toBe(true)
+  })
+
+  it('single with runner on 3rd scores a run', () => {
+    const state = makeGameState()
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 2]
+    state._outcomeFilter = () => 'single'
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBe(totalBefore + 1)
+    expect(state.bases[2]).toBe(false)
+    expect(state.bases[0]).toBe(true)
+  })
+
+  it('double with runner on 1st puts runner on 3rd', () => {
+    const state = makeGameState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state._outcomeFilter = () => 'double'
+    processPitch(state, 'fastball')
+    expect(state.bases[2]).toBe(true)
+    expect(state.bases[1]).toBe(true)
+    expect(state.bases[0]).toBe(false)
+  })
+
+  it('double with runners on 2nd and 3rd scores both', () => {
+    const state = makeGameState()
+    state.bases = [false, true, true]
+    state.runner_indices = [null, 1, 2]
+    state._outcomeFilter = () => 'double'
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBe(totalBefore + 2)
+  })
+
+  it('triple clears all bases and scores all runners', () => {
+    const state = makeGameState()
+    state.bases = [true, true, false]
+    state.runner_indices = [0, 1, null]
+    state._outcomeFilter = () => 'triple'
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBe(totalBefore + 2)
+    expect(state.bases[2]).toBe(true)
+    expect(state.bases[0]).toBe(false)
+    expect(state.bases[1]).toBe(false)
+  })
+
+  it('home run with bases loaded scores 4 (grand slam)', () => {
+    const state = makeGameState()
+    state.bases = [true, true, true]
+    state.runner_indices = [0, 1, 2]
+    state._outcomeFilter = () => 'homerun'
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBe(totalBefore + 4)
+    expect(state.bases[0]).toBe(false)
+    expect(state.bases[1]).toBe(false)
+    expect(state.bases[2]).toBe(false)
+  })
+
+  it('solo home run with empty bases scores 1', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'homerun'
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBe(totalBefore + 1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// WALK ADVANCEMENT
+// ──────────────────────────────────────────────
+describe('walk advancement', () => {
+  it('walk with bases loaded scores a run', () => {
+    const state = makeGameState()
+    state.bases = [true, true, true]
+    state.runner_indices = [0, 1, 2]
+    state.balls = 3
+    state._outcomeFilter = () => 'ball'
+    processPitch(state, 'fastball')
+    expect(state.away_total).toBeGreaterThan(0)
+  })
+
+  it('walk with runner on 1st only moves runner to 2nd', () => {
+    const state = makeGameState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    state.balls = 3
+    state._outcomeFilter = () => 'ball'
+    processPitch(state, 'fastball')
+    expect(state.bases[0]).toBe(true)
+    expect(state.bases[1]).toBe(true)
+  })
+
+  it('walk with runner on 2nd only does not force runner', () => {
+    const state = makeGameState()
+    state.bases = [false, true, false]
+    state.runner_indices = [null, 1, null]
+    state.balls = 3
+    state._outcomeFilter = () => 'ball'
+    processPitch(state, 'fastball')
+    expect(state.bases[0]).toBe(true)
+    expect(state.bases[1]).toBe(true)
+  })
+})
+
+// ──────────────────────────────────────────────
+// FOUL BALL LOGIC
+// ──────────────────────────────────────────────
+describe('foul ball logic', () => {
+  it('foul ball adds a strike when count is 0 strikes', () => {
+    const state = makeGameState()
+    state.strikes = 0
+    state._outcomeFilter = () => 'foul'
+    processPitch(state, 'fastball')
+    expect(state.strikes).toBe(1)
+  })
+
+  it('foul ball adds a strike when count is 1 strike', () => {
+    const state = makeGameState()
+    state.strikes = 1
+    state._outcomeFilter = () => 'foul'
+    processPitch(state, 'fastball')
+    expect(state.strikes).toBe(2)
+  })
+
+  it('foul ball does NOT add a 3rd strike (caps at 2)', () => {
+    const state = makeGameState()
+    state.strikes = 2
+    state.outs = 0
+    state._outcomeFilter = () => 'foul'
+    processPitch(state, 'fastball')
+    expect(state.strikes).toBe(2)
+    expect(state.outs).toBe(0)
+  })
+})
+
+// ──────────────────────────────────────────────
+// ERROR MECHANICS
+// ──────────────────────────────────────────────
+describe('error mechanics', () => {
+  it('error on groundout lets batter reach and charges error to fielding team', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.001)
+    processPitch(state, 'fastball')
+    Math.random.mockRestore()
+    expect(state.home_errors).toBe(1)
+    expect(state.bases[0]).toBe(true)
+    expect(state.outs).toBe(0)
+    expect(state.last_play).toMatch(/Error/)
+  })
+
+  it('error with runner on base can score runs', () => {
+    const state = makeGameState()
+    state.bases = [false, false, true]
+    state.runner_indices = [null, null, 2]
+    state._outcomeFilter = () => 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.001)
+    const totalBefore = state.away_total
+    processPitch(state, 'fastball')
+    Math.random.mockRestore()
+    expect(state.away_total).toBe(totalBefore + 1)
+    expect(state.home_errors).toBe(1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// GAME STATUS & TRANSITIONS
+// ──────────────────────────────────────────────
+describe('game status transitions', () => {
+  it('game starts with active status', () => {
+    const state = makeGameState()
+    expect(state.game_status).toBe('active')
+  })
+
+  it('game ends as final after 9 innings when not tied', () => {
+    const state = makeGameState()
+    state.inning = 9
+    state.is_top = false
+    state.player_role = 'batting'
+    state.player_side = 'home'
+    state.outs = 2
+    state.home_total = 5
+    state.away_total = 3
+    // Force the final out
+    state._forceNextOutcome = 'groundout'
+    // Make sure error doesn't trigger
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    processAtBat(state, 'swing')
+    Math.random.mockRestore()
+    expect(state.game_status).toBe('final')
+  })
+
+  it('game goes to extra innings when tied after 9', () => {
+    const state = makeGameState()
+    state.inning = 9
+    state.is_top = false
+    state.player_role = 'batting'
+    state.player_side = 'home'
+    state.outs = 2
+    state.home_total = 3
+    state.away_total = 3
+    state._forceNextOutcome = 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    processAtBat(state, 'swing')
+    Math.random.mockRestore()
+    expect(state.game_status).toBe('active')
+    expect(state.inning).toBe(10)
+  })
+
+  it('home team leading after bottom of 9th ends the game', () => {
+    const state = makeGameState()
+    state.inning = 9
+    state.is_top = false
+    state.player_role = 'batting'
+    state.player_side = 'home'
+    state.outs = 2
+    state.home_total = 5
+    state.away_total = 3
+    state._forceNextOutcome = 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    processAtBat(state, 'swing')
+    Math.random.mockRestore()
+    // After 3 outs in bottom 9, home leads → game over
+    expect(state.game_status).toBe('final')
+  })
+})
+
+// ──────────────────────────────────────────────
+// NO-HITTER PROTECTION
+// ──────────────────────────────────────────────
+describe('no-hitter protection', () => {
+  it('pitcher is not pulled during a no-hitter even at high pitch count', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 0  // no-hitter in progress
+    state.home_hits = 1
+    state.home_pitch_count = 110 // way past safety net
+    const originalPitcher = state.home_pitcher.name
+    // Run a sim to trigger _maybeSwapPitcher
+    state._outcomeFilter = () => 'strike_swinging'
+    const { state: final } = simulateGame(state)
+    // Home pitcher should never have been changed (no-hitter)
+    const changeMsg = final.play_log.find(m =>
+      m.includes('Pitching change') && m.includes('HME')
+    )
+    // Shouldn't find a pitching change for the home team
+    expect(changeMsg).toBeUndefined()
+  })
+})
+
+// ──────────────────────────────────────────────
+// BULLPEN WARMUP SYSTEM (SIMULATION)
+// ──────────────────────────────────────────────
+describe('bullpen warmup system', () => {
+  it('warmup starts at 75 pitches in simulation', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    state.home_pitch_count = 74
+    // Force all outcomes to be strikes so we can control pitch count
+    state._outcomeFilter = () => 'strike_swinging'
+    // Run just a few pitches via sim
+    const { state: final } = simulateGame(state)
+    // Should see a warmup message around 75 pitches
+    const warmupMsg = final.play_log.find(m => m.includes('warming up'))
+    expect(warmupMsg).toBeDefined()
+  })
+
+  it('reliever enters after warmup completes (~13 pitches after trigger)', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    state.home_pitch_count = 74
+    state._outcomeFilter = () => 'strike_swinging'
+    const { state: final } = simulateGame(state)
+    // Should see pitching change message
+    const changeMsg = final.play_log.find(m => m.includes('Pitching change'))
+    expect(changeMsg).toBeDefined()
+  })
+
+  it('safety net forces swap at 100 pitches', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    // Start at 99 pitches with no warmup started — should force swap at 100
+    state.home_pitch_count = 99
+    state._outcomeFilter = () => 'strike_swinging'
+    const { state: final } = simulateGame(state)
+    const changeMsg = final.play_log.find(m => m.includes('Pitching change'))
+    expect(changeMsg).toBeDefined()
+  })
+
+  it('empty bullpen does not crash when pitch count is high', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    state.home_bullpen = []
+    state.away_bullpen = []
+    state.home_pitch_count = 110
+    state._outcomeFilter = () => 'strike_swinging'
+    expect(() => simulateGame(state)).not.toThrow()
+  })
+})
+
+// ──────────────────────────────────────────────
+// CLASSIC MODE RELIEVERS
+// ──────────────────────────────────────────────
+describe('classic mode relievers', () => {
+  it('classic reliever enters at inning 7', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    state.inning = 6
+    state.is_top = false
+    state.outs = 2
+    state.classic_relievers = { home: 'Reliever', away: 'Away Reliever' }
+    state._outcomeFilter = () => 'strike_swinging'
+    const { state: final } = simulateGame(state)
+    // Should see the named reliever enter
+    const changeMsg = final.play_log.find(m =>
+      m.includes('Pitching change') && m.includes('Reliever')
+    )
+    expect(changeMsg).toBeDefined()
+  })
+})
+
+// ──────────────────────────────────────────────
+// BOX SCORE TRACKING
+// ──────────────────────────────────────────────
+describe('box score tracking', () => {
+  it('strikeout increments batter SO and pitcher SO', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'strike_swinging'
+    state.strikes = 2
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox.so).toBe(1)
+    expect(batterBox.ab).toBe(1)
+    expect(state.home_pitcher_stats.so).toBe(1)
+    expect(state.home_pitcher_stats.ip_outs).toBe(1)
+  })
+
+  it('hit increments batter H and AB', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'single'
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox.h).toBe(1)
+    expect(batterBox.ab).toBe(1)
+    expect(state.away_hits).toBe(1)
+    expect(state.home_pitcher_stats.h).toBe(1)
+  })
+
+  it('home run increments HR, H, RBI, R in box score', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'homerun'
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox.hr).toBe(1)
+    expect(batterBox.h).toBe(1)
+    expect(batterBox.rbi).toBeGreaterThanOrEqual(1)
+    expect(batterBox.r).toBe(1)
+  })
+
+  it('walk increments batter BB and pitcher BB', () => {
+    const state = makeGameState()
+    state.balls = 3
+    state._outcomeFilter = () => 'ball'
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox.bb).toBe(1)
+    expect(state.home_pitcher_stats.bb).toBe(1)
+  })
+
+  it('double is tracked as 2B in box score', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'double'
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox['2b']).toBe(1)
+    expect(batterBox.h).toBe(1)
+  })
+
+  it('triple is tracked as 3B in box score', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'triple'
+    processPitch(state, 'fastball')
+    const batterBox = state.away_box_score[0]
+    expect(batterBox['3b']).toBe(1)
+    expect(batterBox.h).toBe(1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// SCORECARD PA RECORDS
+// ──────────────────────────────────────────────
+describe('scorecard records', () => {
+  it('strikeout creates a scorecard entry with result strikeout', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'strike_swinging'
+    state.strikes = 2
+    processPitch(state, 'fastball')
+    expect(state.away_scorecard.length).toBe(1)
+    expect(state.away_scorecard[0].result).toBe('strikeout')
+  })
+
+  it('single creates a scorecard entry with result single', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'single'
+    processPitch(state, 'fastball')
+    expect(state.away_scorecard.length).toBe(1)
+    expect(state.away_scorecard[0].result).toBe('single')
+  })
+
+  it('scorecard tracks RBI on home run', () => {
+    const state = makeGameState()
+    state._outcomeFilter = () => 'homerun'
+    processPitch(state, 'fastball')
+    const pa = state.away_scorecard[0]
+    expect(pa.rbi).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// BATTING ORDER ROTATION
+// ──────────────────────────────────────────────
+describe('batting order rotation', () => {
+  it('batter index advances after each plate appearance', () => {
+    const state = makeGameState()
+    expect(state.away_batter_idx).toBe(0)
+    state._outcomeFilter = () => 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.99) // no error
+    processPitch(state, 'fastball')
+    Math.random.mockRestore()
+    expect(state.away_batter_idx).toBe(1)
+  })
+
+  it('batter index wraps around after 9th batter', () => {
+    const state = makeGameState()
+    state.away_batter_idx = 8
+    state._outcomeFilter = () => 'groundout'
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    processPitch(state, 'fastball')
+    Math.random.mockRestore()
+    expect(state.away_batter_idx).toBe(0)
+  })
+})
+
+// ──────────────────────────────────────────────
+// PER-INNING SCORING
+// ──────────────────────────────────────────────
+describe('per-inning scoring', () => {
+  it('runs are credited to the correct inning in the score array', () => {
+    const state = makeGameState()
+    state.inning = 3
+    state._outcomeFilter = () => 'homerun'
+    processPitch(state, 'fastball')
+    expect(state.away_score[2]).toBe(1) // inning 3 = index 2
+    expect(state.away_total).toBe(1)
+  })
+})
+
+// ──────────────────────────────────────────────
+// SIMULATION COMPLETENESS
+// ──────────────────────────────────────────────
+describe('simulation', () => {
+  it('simulation runs to completion and produces a final game', () => {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    const { state: final, snapshots } = simulateGame(state)
+    expect(final.game_status).toBe('final')
+    expect(snapshots.length).toBeGreaterThan(1)
+    expect(final.inning).toBeGreaterThanOrEqual(9)
+  })
+
+  it('simulation does nothing on already-finished game', () => {
+    const state = makeGameState()
+    state.game_status = 'final'
+    const { state: final, snapshots } = simulateGame(state)
+    expect(snapshots.length).toBe(0)
+    expect(final.game_status).toBe('final')
+  })
+})
