@@ -768,16 +768,8 @@
         - Batting: user is a home team batter (bottom of inning, home team bats)
       -->
       <div class="controls" v-if="game.game_status === 'active' && !simulating">
+        <!-- Pitching / Batting actions (top row) -->
         <div class="action-bar" :class="{ pitching: game.player_role === 'pitching' }">
-          <!-- Left-justified change pitcher button (pitching only) -->
-          <button
-            v-if="game.player_role === 'pitching' && game[myPrefix + '_bullpen'].length"
-            class="action-btn change-pitcher-action-btn"
-            @click="showBullpen = true"
-            :disabled="loading"
-          >Change Pitcher ({{ Math.max(0, 100 - Math.round(fatiguePercent)) }}%)</button>
-
-          <!-- Pitching buttons -->
           <template v-if="game.player_role === 'pitching'">
             <button
               v-for="pitch in pitchTypes"
@@ -791,7 +783,6 @@
             </button>
           </template>
 
-          <!-- Batting buttons -->
           <template v-if="game.player_role === 'batting'">
             <button class="action-btn swing-btn" @click="doBat('swing')" :disabled="loading">
               Swing!
@@ -809,8 +800,16 @@
               :disabled="loading"
             >Squeeze</button>
           </template>
+        </div>
 
-          <!-- Right-justified sim button -->
+        <!-- Manager actions (bottom row): Change Pitcher + Start Sim -->
+        <div class="utility-bar">
+          <button
+            v-if="game.player_role === 'pitching' && game[myPrefix + '_bullpen'].length"
+            class="action-btn change-pitcher-action-btn"
+            @click="showBullpen = true"
+            :disabled="loading"
+          >Change Pitcher ({{ Math.max(0, 100 - Math.round(fatiguePercent)) }}%)</button>
           <button class="action-btn sim-btn" @click="simulateRest()" :disabled="loading">Start Sim</button>
         </div>
 
@@ -3688,11 +3687,13 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   50% { transform: rotate(3deg) scale(1.05); }
 }
 
-/* Babe Ruth's Called Shot — B&W Wrigley Field background */
-.called-shot-bg {
-  background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
-  background-blend-mode: normal, luminosity;
-  border-radius: 8px;
+/* Babe Ruth's Called Shot — B&W Wrigley Field background (desktop only) */
+@media (min-width: 601px) {
+  .called-shot-bg {
+    background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
+    background-blend-mode: normal, luminosity;
+    border-radius: 8px;
+  }
 }
 
 /* Babe Ruth's Called Shot cinematic */
@@ -3837,17 +3838,19 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 }
 
 /* Single-row action bar: pitch/bat buttons centered, sim button right */
+.utility-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+
 .action-bar {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: center;
-  position: relative;
-}
-
-.action-bar .sim-btn {
-  position: absolute;
-  right: 0;
 }
 
 .change-pitcher-action-btn {
@@ -3861,10 +3864,6 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   color: white;
 }
 
-.action-bar .change-pitcher-action-btn {
-  position: absolute;
-  left: 0;
-}
 
 /* Inverted (filled) button colors when pitching */
 .action-bar.pitching .pitch-btn {
@@ -4853,12 +4852,6 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   .action-bar {
     flex-wrap: wrap;
     justify-content: center;
-    position: static;
-  }
-
-  .action-bar .change-pitcher-action-btn,
-  .action-bar .sim-btn {
-    position: static;
   }
 
   .action-btn {
