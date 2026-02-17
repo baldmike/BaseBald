@@ -2059,6 +2059,20 @@ async function startSimulation() {
         if (pa === 1) st._forceNextOutcome = 'homerun'
       }
     }
+    // Called Shot hook: force HR on Ruth's 3rd PA during simulation
+    if (classicLabel.value === "Babe Ruth's Called Shot") {
+      newGame._prePitchHook = (st) => {
+        if (!st.is_top) return
+        const ruthIdx = st.away_lineup?.findIndex(b => b.name && /\bRuth\b/i.test(b.name))
+        if (ruthIdx === -1 || ruthIdx == null) return
+        const currentIdx = (st.away_batter_idx || 0) % st.away_lineup.length
+        if (currentIdx !== ruthIdx) return
+        const box = st.away_box_score?.[ruthIdx]
+        if (!box) return
+        const pa = (box.ab || 0) + (box.bb || 0)
+        if (pa === 2 && st.balls === 0 && st.strikes === 0) st._forceNextOutcome = 'homerun'
+      }
+    }
     // Step 2: Run the full simulation locally
     const result = simulateGame(newGame)
     // Step 3: Store the snapshot array for replay
@@ -2102,6 +2116,18 @@ function startReplayTimer() {
     // (score, bases, count, play_log, etc.).
     const snap = simSnapshots.value[simReplayIndex.value]
     game.value = { ...game.value, ...snap }
+    // Pause simulation for Called Shot cinematic
+    if (classicLabel.value === "Babe Ruth's Called Shot" && !calledShotShown) {
+      const ruthIdx = game.value.away_lineup?.findIndex(b => b.name && /\bRuth\b/i.test(b.name))
+      if (ruthIdx >= 0) {
+        const box = snap.away_box_score?.[ruthIdx]
+        if (box && box.hr >= 1) {
+          stopReplayTimer()
+          _startCalledShot(null)
+          return
+        }
+      }
+    }
     // Pause simulation for Aaron 715 announcement
     if (classicLabel.value === "Hank Aaron's 715th Home Run" && !aaronVideoOpened.value) {
       const aaronIdx = game.value.home_lineup?.findIndex(b => b.name && b.name.includes('Hank Aaron'))
@@ -2374,14 +2400,14 @@ let calledShotShown = false
 function _isCalledShotPA(state) {
   if (!state || classicLabel.value !== "Babe Ruth's Called Shot") return false
   if (!state.is_top) return false
-  const ruthIdx = state.away_lineup?.findIndex(b => b.name && b.name.includes('Babe Ruth'))
+  const ruthIdx = state.away_lineup?.findIndex(b => b.name && /\bRuth\b/i.test(b.name))
   if (ruthIdx === -1 || ruthIdx == null) return false
   const currentIdx = (state.away_batter_idx || 0) % state.away_lineup.length
   if (currentIdx !== ruthIdx) return false
   const box = state.away_box_score?.[ruthIdx]
   if (!box) return false
   const pa = (box.ab || 0) + (box.bb || 0)
-  return pa === 2
+  return pa === 2 && state.balls === 0 && state.strikes === 0
 }
 
 function _startCalledShot(pitchType) {
@@ -2403,15 +2429,20 @@ function _advanceCalledShot() {
 
 function dismissCalledShot() {
   calledShotActive.value = false
-  // Force a homerun and resolve the pitch
-  game.value._forceNextOutcome = 'homerun'
-  _saveSnapshot()
-  processPitch(game.value, calledShotPendingPitch || 'fastball')
-  calledShotPendingPitch = null
-  for (const id in warmingUp.value) {
-    warmingUp.value[id].pitches++
+  if (simulating.value) {
+    // Resume simulation replay
+    startReplayTimer()
+  } else {
+    // Interactive: force a homerun and resolve the pitch
+    game.value._forceNextOutcome = 'homerun'
+    _saveSnapshot()
+    processPitch(game.value, calledShotPendingPitch || 'fastball')
+    calledShotPendingPitch = null
+    for (const id in warmingUp.value) {
+      warmingUp.value[id].pitches++
+    }
+    game.value = { ...game.value }
   }
-  game.value = { ...game.value }
 }
 
 /** Pending steal: set when the user clicks a steal button, resolved on next swing/take/bunt. */
