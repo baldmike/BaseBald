@@ -513,7 +513,7 @@
       This includes: sound toggle, game-over overlay, scoreboard, field layout
       (diamond + player headshots), last play banner, controls, and play log.
     -->
-    <div v-if="game">
+    <div v-if="game" :class="{ 'called-shot-bg': isCalledShot }">
 
       <!--
         Game Over Overlay — a semi-transparent dark overlay that covers
@@ -775,7 +775,7 @@
             class="action-btn change-pitcher-action-btn"
             @click="showBullpen = true"
             :disabled="loading"
-          >Change Pitcher ({{ currentPitchCount }})</button>
+          >Change Pitcher ({{ Math.max(0, 100 - Math.round(fatiguePercent)) }}%)</button>
 
           <!-- Pitching buttons -->
           <template v-if="game.player_role === 'pitching'">
@@ -1386,6 +1386,9 @@ const classicMatchupData = ref(null)
  */
 const selectedWeather = ref('clear')
 const selectedTimeOfDay = ref('day')
+
+/** Babe Ruth's Called Shot — B&W Wrigley Field background. */
+const isCalledShot = computed(() => classicLabel.value === "Babe Ruth's Called Shot")
 
 /** Dock Ellis LSD no-hitter — special theming on the weather/time-of-day screen. */
 const isDockEllis = computed(() => classicLabel.value === 'Dock Ellis: Just Say No-No')
@@ -3683,6 +3686,13 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 @keyframes ellis-wobble {
   0%, 100% { transform: rotate(-3deg) scale(1); }
   50% { transform: rotate(3deg) scale(1.05); }
+}
+
+/* Babe Ruth's Called Shot — B&W Wrigley Field background */
+.called-shot-bg {
+  background: linear-gradient(rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.7)), url('/wrigley-field.jpg') center/cover no-repeat;
+  background-blend-mode: normal, luminosity;
+  border-radius: 8px;
 }
 
 /* Babe Ruth's Called Shot cinematic */
