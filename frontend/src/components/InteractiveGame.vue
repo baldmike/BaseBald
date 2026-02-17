@@ -3093,7 +3093,7 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 .mode-picker {
   text-align: center;
   padding: 40px 20px;
-  background: linear-gradient(rgba(15, 15, 35, 0.82), rgba(26, 26, 46, 0.92));
+  background: linear-gradient(rgba(15, 15, 35, 0.82), rgba(26, 26, 46, 0.92)), url('/baseball-bg.jpg') center/cover no-repeat;
   border-radius: 10px;
   min-height: 80vh;
   display: flex;
