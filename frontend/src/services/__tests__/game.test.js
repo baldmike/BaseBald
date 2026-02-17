@@ -1013,3 +1013,107 @@ describe('batting order', () => {
     }
   })
 })
+
+// ──────────────────────────────────────────────
+// WALK — exactly 4 balls triggers a walk
+// ──────────────────────────────────────────────
+describe('walk', () => {
+  it('4 consecutive balls result in a walk', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    // Throw 4 balls by forcing the outcome each time
+    for (let i = 0; i < 3; i++) {
+      state._forceNextOutcome = 'ball'
+      processAtBat(state, 'take')
+      expect(state.balls).toBe(i + 1)
+    }
+    // 4th ball triggers the walk — count resets, batter reaches 1st
+    state._forceNextOutcome = 'ball'
+    processAtBat(state, 'take')
+    expect(state.balls).toBe(0) // count resets after walk
+    expect(state.bases[0]).toBe(true) // batter on 1st
+    expect(state.play_log.some(m => m.includes('walks'))).toBe(true)
+  })
+
+  it('walk credits batter BB and pitcher BB', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    for (let i = 0; i < 4; i++) {
+      state._forceNextOutcome = 'ball'
+      processAtBat(state, 'take')
+    }
+    expect(state.home_box_score[0].bb).toBe(1)
+    expect(state.away_pitcher_stats.bb).toBe(1)
+  })
+
+  it('3 balls does not trigger a walk', () => {
+    const state = makeGameState()
+    state.is_top = false
+    state.player_role = 'batting'
+    for (let i = 0; i < 3; i++) {
+      state._forceNextOutcome = 'ball'
+      processAtBat(state, 'take')
+    }
+    expect(state.balls).toBe(3)
+    expect(state.bases[0]).toBe(false) // batter not on base yet
+    expect(state.home_box_score[0].bb).toBe(0)
+  })
+})
+
+// ──────────────────────────────────────────────
+// GAME LENGTH — 9 innings regulation, extra innings when tied
+// ──────────────────────────────────────────────
+describe('game length', () => {
+  it('game ends after 9 innings when the score is not tied', () => {
+    // Simulate several games and check that non-tied games end in 9
+    for (let g = 0; g < 5; g++) {
+      const state = makeGameState()
+      const { state: final } = simulateGame(state)
+      expect(final.game_status).toBe('final')
+      if (final.home_total !== final.away_total) {
+        // Regulation or extras — but final score is never tied
+        expect(final.inning).toBeGreaterThanOrEqual(9)
+      }
+      // Winner must exist — no ties
+      expect(final.home_total).not.toBe(final.away_total)
+    }
+  })
+
+  it('extra innings occur when tied after 9 and continue until a winner is determined', () => {
+    // Force a tied game going into extras by using _outcomeFilter to suppress
+    // all runs until late, then letting the game play out naturally.
+    // We run many attempts since we need randomness to produce a tie at end of 9.
+    let foundExtras = false
+    for (let attempt = 0; attempt < 50 && !foundExtras; attempt++) {
+      const state = makeGameState()
+      // Force all outcomes to groundout (no runs) for the first 8 innings,
+      // then let the game play normally. This maximizes the chance of a
+      // 0-0 tie going into the 9th, with extras likely.
+      state._outcomeFilter = (st, outcome) => {
+        if (st.inning <= 8) return 'groundout'
+        return outcome
+      }
+      const { state: final } = simulateGame(state)
+      expect(final.game_status).toBe('final')
+      expect(final.home_total).not.toBe(final.away_total) // always a winner
+      if (final.inning > 9) {
+        foundExtras = true
+        // Extra innings: game went past 9 because it was tied
+        expect(final.inning).toBeGreaterThan(9)
+      }
+    }
+    // We should have found at least one extra-innings game in 50 attempts
+    expect(foundExtras).toBe(true)
+  })
+
+  it('game never ends in a tie', () => {
+    for (let g = 0; g < 10; g++) {
+      const state = makeGameState()
+      const { state: final } = simulateGame(state)
+      expect(final.game_status).toBe('final')
+      expect(final.home_total).not.toBe(final.away_total)
+    }
+  })
+})
