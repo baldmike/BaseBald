@@ -631,7 +631,8 @@
       -->
       <div class="matchup-title">
         <span v-if="classicLabel" class="classic-label">{{ classicLabel }}</span>
-        {{ resolvedAwaySeason }} {{ game.away_team || 'Away' }} @ {{ resolvedHomeSeason }} {{ game.home_team || 'Home' }}
+        <span class="matchup-teams-line">{{ resolvedAwaySeason }} {{ game.away_team || 'Away' }} @ {{ resolvedHomeSeason }} {{ game.home_team || 'Home' }}</span>
+        <span v-if="classicMatchupData?.date" class="matchup-date-line">{{ classicMatchupData.date }}</span>
       </div>
       <div class="venue-label" v-if="selectedVenue">
         {{ selectedVenue }}
@@ -4137,6 +4138,10 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   margin-bottom: 4px;
 }
 
+.matchup-date-line {
+  display: none;
+}
+
 .classic-label {
   display: block;
   font-size: 13px;
@@ -4870,6 +4875,17 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   .game-container {
     display: flex;
     flex-direction: column;
+  }
+
+  .matchup-date-line {
+    display: block;
+    font-size: 13px;
+    color: #ccc;
+    font-weight: normal;
+  }
+
+  .matchup-title:has(.matchup-date-line) .matchup-teams-line {
+    display: none;
   }
 
   .game-container .controls,
