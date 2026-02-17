@@ -4890,10 +4890,16 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 
   .game-container .controls,
   .game-container .sim-controls {
-    order: 2;
+    order: 1;
   }
 
   .game-container .field-layout {
+    order: 2;
+  }
+
+  .game-container .score-view-toggle,
+  .game-container .scorecard-section,
+  .game-container .box-score-section {
     order: 3;
   }
 
