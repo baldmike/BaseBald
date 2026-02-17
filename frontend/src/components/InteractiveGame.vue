@@ -495,6 +495,32 @@
         </div>
       </div>
 
+      <!-- Dock Ellis no-hitter celebration -->
+      <div v-if="showEllisNoNo" class="game-over-overlay">
+        <div class="ellis-nono-card">
+          <div class="ellis-smiley">&#9786;</div>
+          <h2 class="ellis-message">You did it. Far out, man.</h2>
+          <button class="play-btn" @click="showEllisNoNo = false">Groovy</button>
+        </div>
+      </div>
+
+      <!-- Babe Ruth's Called Shot cinematic -->
+      <div v-if="calledShotActive" class="game-over-overlay">
+        <div class="called-shot-card">
+          <p
+            v-for="(msg, i) in calledShotMessages"
+            :key="i"
+            class="called-shot-line"
+            :class="{ visible: i <= calledShotIndex }"
+          >{{ msg }}</p>
+          <button
+            v-if="calledShotIndex >= calledShotMessages.length - 1"
+            class="play-btn called-shot-btn"
+            @click="dismissCalledShot"
+          >Throw the pitch</button>
+        </div>
+      </div>
+
       <!-- Aaron 715 announcement overlay -->
       <div v-if="aaronAnnouncement" class="game-over-overlay">
         <div class="aaron-overlay-content">
@@ -2195,6 +2221,10 @@ function showPostGame(view) {
 async function resetGame() {
   gameOverDismissed.value = false
   showDiscoVideo.value = false
+  showEllisNoNo.value = false
+  calledShotActive.value = false
+  calledShotShown = false
+  calledShotPendingPitch = null
   gameMode.value = null
   stopReplayTimer()
   simulating.value = false; simPaused.value = false
@@ -2257,6 +2287,11 @@ function doOver() {
  * @param {string} pitchType - One of 'fastball', 'curveball', 'slider', 'changeup'
  */
 function doPitch(pitchType) {
+  // Babe Ruth's Called Shot: intercept on his 3rd PA
+  if (!calledShotShown && _isCalledShotPA(game.value)) {
+    _startCalledShot(pitchType)
+    return
+  }
   _saveSnapshot()
   processPitch(game.value, pitchType)
   for (const id in warmingUp.value) {
@@ -2274,11 +2309,16 @@ function doPitch(pitchType) {
 const aaronVideoOpened = ref(false)
 const aaronAnnouncement = ref(false)
 const showDiscoVideo = ref(false)
+const showEllisNoNo = ref(false)
 
 // Show Disco Demolition video when that game ends
 watch(() => game.value?.game_status, (status) => {
   if (status === 'final' && classicLabel.value === 'Disco Demolition Night') {
     showDiscoVideo.value = true
+  }
+  // Show Ellis no-hitter celebration when the game ends with 0 away hits
+  if (status === 'final' && isDockEllis.value && game.value?.away_hits === 0) {
+    showEllisNoNo.value = true
   }
 })
 
@@ -2317,6 +2357,61 @@ function _afterAaron715(state) {
 function dismissAaronAnnouncement() {
   aaronAnnouncement.value = false
   if (simulating.value) startReplayTimer()
+}
+
+/** Babe Ruth's Called Shot — cinematic sequence on his 3rd plate appearance. */
+const calledShotActive = ref(false)
+const calledShotMessages = [
+  'Ruth steps out of the box...',
+  'The Babe gestures toward center field.',
+  'Ruth raises his bat toward the bleachers.',
+  'The crowd jeers. Ruth points.',
+]
+const calledShotIndex = ref(0)
+let calledShotPendingPitch = null
+let calledShotShown = false
+
+function _isCalledShotPA(state) {
+  if (!state || classicLabel.value !== "Babe Ruth's Called Shot") return false
+  if (!state.is_top) return false
+  const ruthIdx = state.away_lineup?.findIndex(b => b.name && b.name.includes('Babe Ruth'))
+  if (ruthIdx === -1 || ruthIdx == null) return false
+  const currentIdx = (state.away_batter_idx || 0) % state.away_lineup.length
+  if (currentIdx !== ruthIdx) return false
+  const box = state.away_box_score?.[ruthIdx]
+  if (!box) return false
+  const pa = (box.ab || 0) + (box.bb || 0)
+  return pa === 2
+}
+
+function _startCalledShot(pitchType) {
+  calledShotShown = true
+  calledShotPendingPitch = pitchType
+  calledShotIndex.value = 0
+  calledShotActive.value = true
+  _advanceCalledShot()
+}
+
+function _advanceCalledShot() {
+  if (calledShotIndex.value < calledShotMessages.length - 1) {
+    setTimeout(() => {
+      calledShotIndex.value++
+      _advanceCalledShot()
+    }, 2000)
+  }
+}
+
+function dismissCalledShot() {
+  calledShotActive.value = false
+  // Force a homerun and resolve the pitch
+  game.value._forceNextOutcome = 'homerun'
+  _saveSnapshot()
+  processPitch(game.value, calledShotPendingPitch || 'fastball')
+  calledShotPendingPitch = null
+  for (const id in warmingUp.value) {
+    warmingUp.value[id].pitches++
+  }
+  game.value = { ...game.value }
 }
 
 /** Pending steal: set when the user clicks a steal button, resolved on next swing/take/bunt. */
@@ -3126,6 +3221,83 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   color: #f0c040;
   line-height: 1.4;
   margin-bottom: 16px;
+}
+
+/* Dock Ellis no-hitter celebration */
+.ellis-nono-card {
+  text-align: center;
+  padding: 40px 30px;
+  background: radial-gradient(ellipse at center, #2a1a3e 0%, #1a1a2e 70%);
+  border-radius: 16px;
+  border: 2px solid #c084fc;
+  max-width: 400px;
+  animation: ellis-glow 2s ease-in-out infinite alternate;
+}
+
+.ellis-smiley {
+  font-size: 120px;
+  line-height: 1;
+  margin-bottom: 20px;
+  animation: ellis-wobble 3s ease-in-out infinite;
+}
+
+.ellis-message {
+  font-size: 28px;
+  color: #c084fc;
+  margin-bottom: 24px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+@keyframes ellis-glow {
+  from { box-shadow: 0 0 20px rgba(192, 132, 252, 0.3); }
+  to { box-shadow: 0 0 40px rgba(192, 132, 252, 0.6), 0 0 80px rgba(192, 132, 252, 0.2); }
+}
+
+@keyframes ellis-wobble {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  50% { transform: rotate(3deg) scale(1.05); }
+}
+
+/* Babe Ruth's Called Shot cinematic */
+.called-shot-card {
+  text-align: center;
+  padding: 40px 30px;
+  background: linear-gradient(180deg, #1a1a0a 0%, #2a2210 50%, #1a1a0a 100%);
+  border-radius: 16px;
+  border: 2px solid #c8a84e;
+  max-width: 440px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.called-shot-line {
+  font-size: 20px;
+  color: #c8a84e;
+  font-style: italic;
+  line-height: 1.6;
+  margin: 6px 0;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.called-shot-line.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.called-shot-btn {
+  margin-top: 24px;
+  animation: fadeIn 0.6s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* "Game Over!" heading */
