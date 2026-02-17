@@ -201,17 +201,12 @@ body {
 }
 
 @media (max-width: 600px) {
-  .header-inner {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .header-logo {
-    justify-content: center;
+  .header-subtitle {
+    display: none;
   }
 
   .nav-tabs {
-    justify-content: center;
+    justify-content: flex-end;
   }
 }
 </style>
