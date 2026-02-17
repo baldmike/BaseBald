@@ -3794,10 +3794,12 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
   transform: translateY(-1px);
 }
 
-/* Unlock section below matchup grids */
+/* Unlock section below matchup grids — silver separator divides free content from upgrade CTA */
 .unlock-section {
   max-width: 420px;
   margin: 18px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid #888;
   text-align: center;
 }
 
