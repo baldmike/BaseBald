@@ -23,7 +23,7 @@
         </a>
         <!-- During gameplay: home + volume buttons instead of nav tabs -->
         <div v-if="activeTab === 'play' && gameRef?.isPlaying" class="game-header-controls">
-          <button class="nav-tab sound-nav-btn" @click="goHome" title="Home">🏠</button>
+          <button class="nav-tab sound-nav-btn" @click="goHome" title="Home">&#8962;</button>
           <button class="nav-tab sound-nav-btn" @click="gameRef.onToggleSound()" :title="gameRef.soundMuted ? 'Unmute' : 'Mute'">
             {{ gameRef.soundMuted ? '🔇' : '🔊' }}
           </button>
@@ -174,6 +174,13 @@ body {
 .sound-nav-btn {
   min-width: auto;
   padding: 6px 10px;
+  width: 40px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .app-main {
