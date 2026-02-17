@@ -460,20 +460,20 @@ const gridStyle = computed(() => ({
 /* ========== Mobile Responsive ========== */
 @media (max-width: 600px) {
   .scoreboard {
-    padding: 8px;
+    padding: 6px;
   }
 
   .cell {
-    padding: 4px 2px;
-    font-size: 12px;
+    padding: 3px 2px;
+    font-size: 11px;
   }
 
   .cell.header {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .cell.team-col {
-    font-size: 11px;
+    font-size: 10px;
     padding-left: 2px;
   }
 
@@ -482,26 +482,47 @@ const gridStyle = computed(() => ({
     height: 14px;
   }
 
+  .game-info {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .info-label {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
   .count-numbers {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .inning-number {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .out-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .out-dots {
+    margin-top: 3px;
+    gap: 6px;
   }
 
   .last-play {
-    font-size: 13px;
-    padding: 8px 10px;
+    font-size: 11px;
+    padding: 4px 6px;
+    margin-top: 4px;
+    height: 36px;
+    overflow: hidden;
   }
 
-  .scoreboard {
-    min-height: 140px;
+  .last-play .play-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 

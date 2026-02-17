@@ -2721,9 +2721,10 @@ function dismissCalledShot() {
     game.value = { ...game.value }
   } else {
     // Player is pitching against Ruth — force HR and resolve the pitch
-    game.value._forceNextOutcome = 'homerun'
+    game.value._outcomeFilter = () => 'homerun'
     _saveSnapshot()
     processPitch(game.value, calledShotPendingPitch || 'fastball')
+    game.value._outcomeFilter = null
     calledShotPendingPitch = null
     for (const id in warmingUp.value) {
       warmingUp.value[id].pitches++
