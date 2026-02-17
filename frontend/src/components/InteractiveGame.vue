@@ -4867,6 +4867,14 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 
 /* ========== Mobile Responsive ========== */
 @media (max-width: 600px) {
+  .mode-picker {
+    background-image: none !important;
+  }
+
+  .called-shot-bg {
+    background-image: none !important;
+  }
+
   /* Tighter padding on wizard screens */
   .start-screen {
     padding: 16px 10px;
