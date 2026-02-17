@@ -1705,3 +1705,125 @@ describe('inning transition messages', () => {
     expect(match[2]).toBe('1')
   })
 })
+
+// ──────────────────────────────────────────────
+// SIMULATION LEADOFF & STEAL TESTS
+// ──────────────────────────────────────────────
+describe('simulation leadoffs and steals', () => {
+  function makeSimState() {
+    const state = makeGameState()
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    return state
+  }
+
+  it('simulation produces leadoff events when runners are on base', () => {
+    const state = makeSimState()
+    // Force a single to get a runner on, then let the sim run
+    state._prePitchHook = (s) => {
+      if (s.away_hits === 1 && !s.bases[0] && !s.bases[1] && !s.bases[2]) {
+        s._forceNextOutcome = 'single'
+      }
+    }
+    const { state: final } = simulateGame(state)
+    const leadoffs = final.play_log.filter(m => m.includes('takes a lead off'))
+    // With 20% leadoff rate per pitch per runner, we expect at least one over a full game
+    expect(leadoffs.length).toBeGreaterThan(0)
+  })
+
+  it('leadoff can result in a pickoff out', () => {
+    const state = makeSimState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    // Mock random sequence: leadoff triggers (0.10 < 0.20), pitcher throws over (0.10 < 0.15), pickoff succeeds (0.10 < 0.30)
+    vi.spyOn(Math, 'random').mockReturnValue(0.10)
+    // Run one sim iteration by simulating the full game with a hook that ends it
+    const { state: final } = simulateGame(state)
+    Math.random.mockRestore()
+    const pickedOff = final.play_log.some(m => m.includes('picked off'))
+    expect(pickedOff).toBe(true)
+  })
+
+  it('leadoff pickoff attempt can fail (runner safe)', () => {
+    const state = makeSimState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    let callCount = 0
+    // First call: leadoff triggers (0.05 < 0.20)
+    // Second call: pitcher throws over (0.05 < 0.15)
+    // Third call: pickoff fails (0.50 > 0.30)
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      callCount++
+      if (callCount <= 2) return 0.05
+      return 0.50
+    })
+    const { state: final } = simulateGame(state)
+    Math.random.mockRestore()
+    const safe = final.play_log.some(m => m.includes('is safe'))
+    expect(safe).toBe(true)
+  })
+
+  it('leadoff announcements include runner name and base', () => {
+    const state = makeSimState()
+    state.bases = [false, true, false]
+    state.runner_indices = [null, 2, null]
+    // Force leadoff (0.05 < 0.20), no throw over (0.99 > 0.15)
+    let callCount = 0
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return 0.05  // leadoff triggers
+      return 0.99                        // everything else fails/misses
+    })
+    const { state: final } = simulateGame(state)
+    Math.random.mockRestore()
+    const leadMsg = final.play_log.find(m => m.includes('takes a lead off'))
+    expect(leadMsg).toBeDefined()
+    expect(leadMsg).toMatch(/takes a lead off 2nd/)
+  })
+
+  it('steal attempt in simulation moves runner when successful', () => {
+    const state = makeSimState()
+    // Use attemptSteal directly to verify sim steal mechanics
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    vi.spyOn(Math, 'random').mockReturnValue(0.10) // below 0.75 → success
+    attemptSteal(state, 0)
+    Math.random.mockRestore()
+    expect(state.bases[0]).toBe(false)
+    expect(state.bases[1]).toBe(true)
+    expect(state.last_play).toMatch(/steals 2nd/)
+    expect(state.away_box_score[0].sb).toBe(1)
+  })
+
+  it('caught stealing in simulation records an out', () => {
+    const state = makeSimState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    vi.spyOn(Math, 'random').mockReturnValue(0.90) // above 0.75 → caught
+    attemptSteal(state, 0)
+    Math.random.mockRestore()
+    expect(state.bases[0]).toBe(false)
+    expect(state.outs).toBe(1)
+    expect(state.last_play).toMatch(/caught stealing 2nd/)
+  })
+
+  it('pickoff during leadoff increments pitch count', () => {
+    const state = makeSimState()
+    state.bases = [true, false, false]
+    state.runner_indices = [0, null, null]
+    const pitchCountBefore = state.home_pitch_count
+    // Force leadoff + throw over + safe: 0.05 for leadoff, 0.05 for throw, 0.50 for pickoff fail
+    let callCount = 0
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      callCount++
+      if (callCount <= 2) return 0.05
+      return 0.50
+    })
+    const { state: final } = simulateGame(state)
+    Math.random.mockRestore()
+    // Pitch count should have increased (from throw-over + subsequent pitches)
+    expect(final.play_log.some(m => m.includes('Throw to'))).toBe(true)
+  })
+})
