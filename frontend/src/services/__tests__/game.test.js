@@ -2402,6 +2402,36 @@ describe("Babe Ruth's Called Shot detection", () => {
     expect(state.home_box_score[0].hr).toBe(1)
     expect(state.last_play).toMatch(/homerun/i)
   })
+
+  it('_prePitchHook guarantees Ruth homers on 3rd PA in simulation', () => {
+    const state = makeGameState()
+    // Put Ruth at index 2 (3rd in lineup)
+    state.away_lineup[2] = { id: 999, name: 'Babe Ruth', stats: { avg: 0.341, slg: 0.700, k_rate: 0.090, hr_rate: 0.086 } }
+    state.away_box_score[2] = { id: 999, name: 'Babe Ruth', pos: 'RF', ab: 0, r: 0, h: 0, '2b': 0, '3b': 0, hr: 0, rbi: 0, bb: 0, so: 0, sb: 0 }
+    state.home_warmup = null
+    state.away_warmup = null
+    state.away_hits = 1
+    state.home_hits = 1
+    // Same hook used by the Called Shot game
+    state._prePitchHook = (st) => {
+      if (!st.is_top) return
+      const ruthIdx = st.away_lineup?.findIndex(b => b.name && /\bRuth\b/i.test(b.name))
+      if (ruthIdx === -1 || ruthIdx == null) return
+      const currentIdx = (st.away_batter_idx || 0) % st.away_lineup.length
+      if (currentIdx !== ruthIdx) return
+      const box = st.away_box_score?.[ruthIdx]
+      if (!box) return
+      const pa = (box.ab || 0) + (box.bb || 0)
+      if (pa === 2 && st.balls === 0 && st.strikes === 0) st._forceNextOutcome = 'homerun'
+    }
+    const { state: final } = simulateGame(state)
+    // Ruth should have at least 1 HR from the forced 3rd PA
+    const ruthBox = final.away_box_score[2]
+    expect(ruthBox.hr).toBeGreaterThanOrEqual(1)
+    // Verify the play log mentions it
+    const hrMsg = final.play_log.find(m => /Babe Ruth/.test(m) && /homerun/i.test(m))
+    expect(hrMsg).toBeDefined()
+  })
 })
 
 // ──────────────────────────────────────────────
