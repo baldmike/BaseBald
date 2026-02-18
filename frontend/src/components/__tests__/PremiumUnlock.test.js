@@ -47,13 +47,13 @@ describe('Premium Unlock', () => {
   })
 
   // ──────────────────────────────────────────────
-  // TEST 26: Fantasy mode shows only 6 free matchups by default
+  // TEST 26: Fantasy mode shows only 7 free matchups by default
   // ──────────────────────────────────────────────
-  it('shows 6 fantasy matchups before unlock', async () => {
+  it('shows 7 fantasy matchups before unlock', async () => {
     const wrapper = mountInMode('fantasy')
     await wrapper.vm.$nextTick()
     const cards = wrapper.findAll('.matchup-card')
-    expect(cards.length).toBe(6)
+    expect(cards.length).toBe(7)
   })
 
   // ──────────────────────────────────────────────
@@ -101,9 +101,9 @@ describe('Premium Unlock', () => {
   })
 
   // ──────────────────────────────────────────────
-  // TEST 30: Correct code unlocks all 15 fantasy matchups
+  // TEST 30: Correct code unlocks all 16 fantasy matchups
   // ──────────────────────────────────────────────
-  it('unlocks all 15 fantasy matchups with correct code', async () => {
+  it('unlocks all 16 fantasy matchups with correct code', async () => {
     const wrapper = mountInMode('fantasy')
     await wrapper.vm.$nextTick()
 
@@ -112,7 +112,7 @@ describe('Premium Unlock', () => {
     await wrapper.find('.unlock-submit').trigger('click')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('.matchup-card').length).toBe(15)
+    expect(wrapper.findAll('.matchup-card').length).toBe(16)
   })
 
   // ──────────────────────────────────────────────

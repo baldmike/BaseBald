@@ -572,6 +572,26 @@
         </div>
       </div>
 
+      <!-- The Apex Duel pre-game banner -->
+      <div v-if="apexDuelBanner" class="game-over-overlay">
+        <div class="apex-duel-card">
+          <h2 class="apex-duel-title">The Apex Duel</h2>
+          <div class="apex-duel-pitcher">
+            <div class="apex-duel-name">Sandy Koufax</div>
+            <div class="apex-duel-era">2.04 ERA</div>
+            <div class="apex-duel-accolade">Cy Young, Perfect Game</div>
+          </div>
+          <div class="apex-duel-vs">vs</div>
+          <div class="apex-duel-pitcher">
+            <div class="apex-duel-name">Pedro Martinez</div>
+            <div class="apex-duel-era">1.74 ERA</div>
+            <div class="apex-duel-accolade">Multiple 1-hit outings, Dominated the steroid era</div>
+          </div>
+          <p class="apex-duel-luck">Good Luck.</p>
+          <button class="play-btn apex-duel-btn" @click="dismissApexDuel">Let's Go</button>
+        </div>
+      </div>
+
       <!-- Babe Ruth's Called Shot cinematic -->
       <div v-if="calledShotActive" class="game-over-overlay">
         <div class="called-shot-card">
@@ -1396,6 +1416,11 @@ const selectedTimeOfDay = ref('day')
 /** Babe Ruth's Called Shot — B&W Wrigley Field background. */
 const isCalledShot = computed(() => classicLabel.value === "Babe Ruth's Called Shot")
 
+/** The Apex Duel — Pedro vs Koufax, always low-scoring. */
+const isApexDuel = computed(() => classicLabel.value === 'The Apex Duel')
+const apexDuelBanner = ref(false)
+let apexDuelPendingAction = null // 'play' or 'simulate'
+
 /** Dock Ellis LSD no-hitter — special theming on the weather/time-of-day screen. */
 const isDockEllis = computed(() => classicLabel.value === 'Dock Ellis: Just Say No-No')
 const ellisWeatherLabel = { clear: 'Trippy Skies', hot: 'Hot & Humid', wind_out: 'Wind Out', wind_in: 'Wind In', cold: 'Lucy', rain: 'Sky', dome: 'Diamonds' }
@@ -1694,6 +1719,7 @@ const freeFantasyMatchups = [
   { label: 'Pitching Duel', subtitle: 'Old School Duel', home: { id: 138, name: 'Cardinals', season: 1968, pitcherId: 114756, pitcherName: 'Bob Gibson' }, away: { id: 119, name: 'Dodgers', season: 1963, pitcherId: 117277, pitcherName: 'Sandy Koufax' } },
   { label: "Big Red Machine vs Murderer's Row", subtitle: "You've waited long enough.", home: { id: 147, name: 'Yankees', season: 1927, pitcherId: 116241, pitcherName: 'Waite Hoyt' }, away: { id: 113, name: 'Reds', season: 1975, pitcherId: 115239, pitcherName: 'Don Gullett' } },
   { label: 'Battle for The Bottom', subtitle: 'Worst of the Worst', home: { id: 145, name: 'White Sox', season: 2024, pitcherId: 676979, pitcherName: 'Garrett Crochet' }, away: { id: 121, name: 'Mets', season: 1962, pitcherId: 112783, pitcherName: 'Roger Craig' } },
+  { label: 'The Apex Duel', subtitle: 'Two of the greatest arms ever. Low runs guaranteed.', home: { id: 111, name: 'Red Sox', season: 2000, pitcherId: 118377, pitcherName: 'Pedro Martinez' }, away: { id: 119, name: 'Dodgers', season: 1965, pitcherId: 117277, pitcherName: 'Sandy Koufax' } },
 ]
 
 const premiumFantasyMatchups = [
@@ -2196,7 +2222,44 @@ function _applyEllisNoHitter(state) {
   }
 }
 
+function _applyApexDuelFilter(state) {
+  const outReplacements = ['groundout', 'flyout', 'lineout', 'groundout', 'flyout']
+  state._outcomeFilter = (st, outcome) => {
+    // Downgrade extra-base hits: HR → single 85%, double → single 70%, triple → single 80%
+    if (outcome === 'homerun') {
+      return Math.random() < 0.15 ? 'single' : outReplacements[Math.floor(Math.random() * outReplacements.length)]
+    }
+    if (outcome === 'triple') {
+      return Math.random() < 0.20 ? 'single' : 'double'
+    }
+    if (outcome === 'double') {
+      return Math.random() < 0.30 ? outcome : 'single'
+    }
+    // Convert ~40% of singles to outs
+    if (outcome === 'single') {
+      return Math.random() < 0.40 ? outReplacements[Math.floor(Math.random() * outReplacements.length)] : outcome
+    }
+    return outcome
+  }
+}
+
+function dismissApexDuel() {
+  apexDuelBanner.value = false
+  if (apexDuelPendingAction === 'play') {
+    apexDuelPendingAction = null
+    startGame()
+  } else if (apexDuelPendingAction === 'simulate') {
+    apexDuelPendingAction = null
+    startSimulation()
+  }
+}
+
 async function startGame() {
+  if (isApexDuel.value && !apexDuelBanner.value) {
+    apexDuelPendingAction = 'play'
+    apexDuelBanner.value = true
+    return
+  }
   loading.value = true
   try {
     const newGame = await createNewGame({
@@ -2211,6 +2274,7 @@ async function startGame() {
       playerSide: playerSide.value,
     })
     if (isDockEllis.value) _applyEllisNoHitter(newGame)
+    if (isApexDuel.value) _applyApexDuelFilter(newGame)
     await _ellistMeltTransition(() => { game.value = newGame })
   } finally {
     loading.value = false
@@ -2263,6 +2327,11 @@ function _buildClassicRelievers() {
 }
 
 async function startSimulation() {
+  if (isApexDuel.value && !apexDuelBanner.value) {
+    apexDuelPendingAction = 'simulate'
+    apexDuelBanner.value = true
+    return
+  }
   loading.value = true
   try {
     // Step 1: Create the game with the configured teams/pitchers
@@ -2280,6 +2349,8 @@ async function startSimulation() {
     })
     // Dock Ellis: apply no-hitter filter for simulation too
     if (isDockEllis.value) _applyEllisNoHitter(newGame)
+    // Apex Duel: apply low-scoring filter for simulation too
+    if (isApexDuel.value) _applyApexDuelFilter(newGame)
     // Aaron 715 hook: force HR on his 2nd PA during simulation
     if (classicLabel.value === "Hank Aaron's 715th Home Run") {
       newGame._prePitchHook = (st) => {
@@ -2488,6 +2559,8 @@ async function resetGame() {
   showEllisNoNo.value = false
   calledShotActive.value = false
   calledShotHRBanner.value = false
+  apexDuelBanner.value = false
+  apexDuelPendingAction = null
   calledShotShown = false
   calledShotPendingPitch = null
   calledShotPendingAction = null
@@ -3757,6 +3830,71 @@ defineExpose({ showBackButton, handleBack, isPlaying, resetGame, soundMuted, onT
 @keyframes ellis-wobble {
   0%, 100% { transform: rotate(-3deg) scale(1); }
   50% { transform: rotate(3deg) scale(1.05); }
+}
+
+/* The Apex Duel pre-game banner */
+.apex-duel-card {
+  text-align: center;
+  padding: 40px 30px;
+  background: linear-gradient(180deg, #0a1628 0%, #1a2744 50%, #0a1628 100%);
+  border-radius: 16px;
+  border: 2px solid #4a90d9;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.apex-duel-title {
+  font-size: 28px;
+  color: #fff;
+  margin: 0 0 24px 0;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.apex-duel-pitcher {
+  margin: 8px 0;
+}
+
+.apex-duel-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #4a90d9;
+}
+
+.apex-duel-era {
+  font-size: 18px;
+  color: #e94560;
+  font-weight: 600;
+  margin: 2px 0;
+}
+
+.apex-duel-accolade {
+  font-size: 13px;
+  color: #aaa;
+  font-style: italic;
+  max-width: 300px;
+}
+
+.apex-duel-vs {
+  font-size: 16px;
+  color: #666;
+  margin: 8px 0;
+  text-transform: lowercase;
+  font-style: italic;
+}
+
+.apex-duel-luck {
+  font-size: 18px;
+  color: #e94560;
+  font-weight: 700;
+  margin: 20px 0 8px 0;
+  font-style: italic;
+}
+
+.apex-duel-btn {
+  margin-top: 16px;
 }
 
 /* Babe Ruth's Called Shot — B&W Wrigley Field background */
